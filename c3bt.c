@@ -107,13 +107,13 @@ typedef struct c3bt_cursor_impl {
 } c3bt_cursor_impl;
 
 #ifdef C3BT_STATS
-uint c3bt_stat_cells = 0;
-uint c3bt_stat_pushdowns = 0;
-uint c3bt_stat_splits = 0;
-uint c3bt_stat_pushups = 0;
-uint c3bt_stat_mergeups = 0;
-uint c3bt_stat_mergedowns = 0;
-uint c3bt_stat_failed_merges = 0;
+uint c3bt_stat_cells;
+uint c3bt_stat_pushdowns;
+uint c3bt_stat_splits;
+uint c3bt_stat_pushups;
+uint c3bt_stat_mergeups;
+uint c3bt_stat_mergedowns;
+uint c3bt_stat_failed_merges;
 uint c3bt_stat_popdist[CELL_MAX_NODES];
 #endif
 
@@ -894,7 +894,7 @@ static bool cell_push_down(c3bt_cell *cell)
     int n, np, c, sibling, old_root, new_ptr;
     c3bt_cell *sub;
 
-    for (n = 0; n < CELL_MAX_NODES; n++) {
+    for (n = 1; n < CELL_MAX_NODES; n++) {
         if (cell_node_is_vacant(cell, n))
             continue;
         for (c = 0; c < 2; c++) {
@@ -902,9 +902,9 @@ static bool cell_push_down(c3bt_cell *cell)
             if (CHILD_IS_CELL(cell->N[n].child[c])
                 && !CHILD_IS_NODE(cell->N[n].child[1 - c])) {
                 sub = cell->P[cell->N[n].child[c] & INDEX_MASK];
-                sibling = cell->N[n].child[1 - c];
                 /* Only plush down when sub has at least 2 vacancies. */
                 if (cell_ncount(sub) < CELL_MAX_NODES - 1) {
+                    sibling = cell->N[n].child[1 - c];
                     old_root = cell_alloc_node(sub);
                     new_ptr = cell_alloc_ptr(sub);
                     cell_inc_ncount(sub, 1);
