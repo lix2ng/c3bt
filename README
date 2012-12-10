@@ -1,4 +1,47 @@
-c3bt
-====
+C3BT: Compact Clustered Crit-Bit Tree
 
-Compact Clustered Crit-Bit Tree
+Introduction
+------------
+Take Crit-Bit Tree (as CBT hereafter), squeeze the nodes into cache line sized
+cells, and we get C3BT.  So if you like, you may read C3BT as "Cache-Conscious
+Crit-Bit Tree".
+
+In the 32-bit standard layout, each cell is 64B and holds up to 8 crit-bit
+nodes.  It can index keys up to 256 bits long.  The 64-bit version (TODO) uses
+128B cells each contains 9 nodes and supports 64K bits keys.
+
+C3BT also extends the functionality of CBT.  Its API should be familiar by
+binary search tree users and the key is not limited to string or bit-string; it
+supports common key data types with proper ordering.  You may easily extend the
+data types by writing a custom "bitops" -- like a comparator to a BST.
+
+C3BT (and CBT in general) is a separate index, you add/remove user objects by
+reference (this is due to the nature of CBT: each node bisects the remaining
+value space rather than using the key as a separator to bisect the key set like
+a BST does).  But since it's clustered and cache friendly, you get both
+performance and flexibility:
+
+    - Memory allocation overhead of the index is low.
+    - Index access is fast.
+    - User objects are not diluted by index; this can make a difference if user
+      object is small. 
+    - Index can be created and destroyed freely.
+
+The author hopes C3BT can help popularize CBT as an alternative to BSTs, T-Tree
+and in-memory B-Tree.  CBT works on the fundamental representation of data, and
+playing with bits is fun.
+
+Build
+-----
+Just type "make". There are 3 files: c3bt.h, c3bt.c and c3bt-main.c.  The first
+two are ready to integrate into your project, and the third is an ugly ad-hoc
+tester.
+
+This version supports only GCC and 32-bit platforms.
+
+Quick User Guide
+----------------
+<<to be continued>>
+
+# vim: set et ts=4 tw=80 spell spl=en_us:
+
