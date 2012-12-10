@@ -41,7 +41,7 @@ int main()
     for (i = 0; i < ASIZE; i++)
         c3bt_add(&tree, array + i);
     clock_gettime(CLOCK_MONOTONIC, &t_end);
-    printf("Add 100k uobjs: %ldus ",
+    printf("Add %dk uobjs: %ldus ", ASIZE/1000,
         (t_end.tv_sec - t_start.tv_sec) * 1000000
             + (t_end.tv_nsec - t_start.tv_nsec) / 1000);
     print_stats(&tree);
@@ -51,7 +51,7 @@ int main()
     for (i = 0; i < ASIZE; i += 2)
         c3bt_remove(&tree, array + i);
     clock_gettime(CLOCK_MONOTONIC, &t_end);
-    printf("Remove 50k uobjs: %ldus ",
+    printf("Remove %dk uobjs: %ldus ", ASIZE/2000,
         (t_end.tv_sec - t_start.tv_sec) * 1000000
             + (t_end.tv_nsec - t_start.tv_nsec) / 1000);
     print_stats(&tree);
@@ -61,7 +61,7 @@ int main()
     for (i = 0; i < ASIZE; i += 2)
         c3bt_add(&tree, array + i);
     clock_gettime(CLOCK_MONOTONIC, &t_end);
-    printf("Re-add 50k uobjs: %ldus ",
+    printf("Re-add %dk uobjs: %ldus ", ASIZE/2000,
         (t_end.tv_sec - t_start.tv_sec) * 1000000
             + (t_end.tv_nsec - t_start.tv_nsec) / 1000);
     print_stats(&tree);
