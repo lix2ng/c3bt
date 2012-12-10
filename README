@@ -15,11 +15,12 @@ binary search tree users and the key is not limited to string or bit-string; it
 supports common key data types with proper ordering.  You may easily extend the
 data types by writing a custom "bitops" -- like a comparator to a BST.
 
-C3BT (and CBT in general) is a separate index, you add/remove user objects by
-reference (this is due to the nature of CBT: each node bisects the remaining
-value space rather than using the key as a separator to bisect the key set like
-a BST does).  But since it's clustered and cache friendly, you get both
-performance and flexibility:
+Most implementations of BST embed index nodes in user objects, but C3BT (like
+CBT) is a separate index, you add/remove user objects by reference.  This is due
+to the nature of CBT: each node bisects the remaining value space by a crit-bit,
+rather than using the key as a separator to bisect the key set like a BST does.
+But since it's clustered in a cache friendly way, you get both performance and
+flexibility:
 
     - Memory allocation overhead of the index is low.
     - Index access is fast.
