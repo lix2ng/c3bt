@@ -6,16 +6,17 @@
 
 void print_stats(c3bt_tree* tree)
 {
-    printf("%d uobjs in %d cells, %d splits %d/%d/%d merges %d fails.\n",
-        c3bt_nobjects(tree), c3bt_stat_cells, c3bt_stat_splits,
-        c3bt_stat_merges, c3bt_stat_mergeups, c3bt_stat_mergedowns,
-        c3bt_stat_failed_merges);
+    printf("%d uobjs in %d cells, %d pushdowns %d splits %d pushups "
+        "%d/%d merges %d fails.\n", c3bt_nobjects(tree), c3bt_stat_cells,
+        c3bt_stat_pushdowns, c3bt_stat_splits, c3bt_stat_pushups,
+        c3bt_stat_mergeups, c3bt_stat_mergedowns, c3bt_stat_failed_merges);
 }
 
 void clear_stats()
 {
+    c3bt_stat_pushdowns = 0;
     c3bt_stat_splits = 0;
-    c3bt_stat_merges = 0;
+    c3bt_stat_pushups = 0;
     c3bt_stat_mergeups = 0;
     c3bt_stat_mergedowns = 0;
     c3bt_stat_failed_merges = 0;
@@ -41,7 +42,7 @@ int main()
     for (i = 0; i < ASIZE; i++)
         c3bt_add(&tree, array + i);
     clock_gettime(CLOCK_MONOTONIC, &t_end);
-    printf("Add %dk uobjs: %ldus ", ASIZE/1000,
+    printf("Add %dk uobjs: %ldus\n", ASIZE / 1000,
         (t_end.tv_sec - t_start.tv_sec) * 1000000
             + (t_end.tv_nsec - t_start.tv_nsec) / 1000);
     print_stats(&tree);
@@ -51,7 +52,7 @@ int main()
     for (i = 0; i < ASIZE; i += 2)
         c3bt_remove(&tree, array + i);
     clock_gettime(CLOCK_MONOTONIC, &t_end);
-    printf("Remove %dk uobjs: %ldus ", ASIZE/2000,
+    printf("Remove %dk uobjs: %ldus\n", ASIZE / 2000,
         (t_end.tv_sec - t_start.tv_sec) * 1000000
             + (t_end.tv_nsec - t_start.tv_nsec) / 1000);
     print_stats(&tree);
@@ -61,7 +62,7 @@ int main()
     for (i = 0; i < ASIZE; i += 2)
         c3bt_add(&tree, array + i);
     clock_gettime(CLOCK_MONOTONIC, &t_end);
-    printf("Re-add %dk uobjs: %ldus ", ASIZE/2000,
+    printf("Re-add %dk uobjs: %ldus\n", ASIZE / 2000,
         (t_end.tv_sec - t_start.tv_sec) * 1000000
             + (t_end.tv_nsec - t_start.tv_nsec) / 1000);
     print_stats(&tree);

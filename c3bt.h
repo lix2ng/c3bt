@@ -31,8 +31,9 @@ typedef unsigned char bool;
 
 #ifdef C3BT_STATS
 extern uint c3bt_stat_cells; /* numbers of cells in use. */
+extern uint c3bt_stat_pushdowns; /* node push-down operations. */
 extern uint c3bt_stat_splits; /* cell split operations. */
-extern uint c3bt_stat_merges; /* "silent" merges of incomplete cells. */
+extern uint c3bt_stat_pushups; /* up-merge incomplete cells. */
 extern uint c3bt_stat_mergeups; /* explicit upwards cell merges. */
 extern uint c3bt_stat_mergedowns; /* explicit downwards cell merges. */
 extern uint c3bt_stat_failed_merges; /* unsuccessful explicit merges. */

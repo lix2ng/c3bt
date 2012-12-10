@@ -108,8 +108,9 @@ typedef struct c3bt_cursor_impl {
 
 #ifdef C3BT_STATS
 uint c3bt_stat_cells = 0;
+uint c3bt_stat_pushdowns = 0;
 uint c3bt_stat_splits = 0;
-uint c3bt_stat_merges = 0;
+uint c3bt_stat_pushups = 0;
 uint c3bt_stat_mergeups = 0;
 uint c3bt_stat_mergedowns = 0;
 uint c3bt_stat_failed_merges = 0;
@@ -459,7 +460,8 @@ void *c3bt_find_bits(c3bt_tree *c3bt, uint8_t *key)
     robj = tree_lookup(tree, key, NULL);
     if (robj == NULL)
         return NULL;
-    if (memcmp(key, robj + tree->key_offset, (tree->key_nbits + 7) / 8) == 0)
+    if (memcmp(key, (char*)robj + tree->key_offset, (tree->key_nbits + 7) / 8)
+        == 0)
         return robj;
     return NULL;
 }
@@ -497,12 +499,12 @@ static _noinline void *c3bt_find_integer(c3bt_tree *c3bt, uint64_t key,
     switch (kdt) {
         case C3BT_KDT_U32:
         case C3BT_KDT_S32:
-            if (*(uint32_t*)(robj + tree->key_offset) == bits.u32)
+            if (*(uint32_t*)((char*)robj + tree->key_offset) == bits.u32)
                 return robj;
             break;
         case C3BT_KDT_U64:
         case C3BT_KDT_S64:
-            if (*(uint64_t*)(robj + tree->key_offset) == bits.u64)
+            if (*(uint64_t*)((char*)robj + tree->key_offset) == bits.u64)
                 return robj;
             break;
     }
@@ -556,11 +558,11 @@ void *c3bt_find_str(c3bt_tree *c3bt, char *key)
     if (robj == NULL)
         return NULL;
     if (tree->key_type == C3BT_KDT_PSTR) {
-        if (strncmp(key, *(char**)(robj + tree->key_offset),
+        if (strncmp(key, *(char**)((char*)robj + tree->key_offset),
             tree->key_nbits / 8) == 0)
             return robj;
     } else {
-        if (strncmp(key, (char*)(robj + tree->key_offset), tree->key_nbits / 8)
+        if (strncmp(key, (char*)robj + tree->key_offset, tree->key_nbits / 8)
             == 0)
             return robj;
     }
@@ -582,11 +584,12 @@ void *c3bt_locate(c3bt_tree *c3bt, void *uobj, c3bt_cursor *cur)
         return NULL;
 
     tree = (c3bt_tree_impl*)c3bt;
-    robj = tree_lookup(tree, uobj + tree->key_offset, (c3bt_cursor_impl*)cur);
+    robj = tree_lookup(tree, (char*)uobj + tree->key_offset,
+        (c3bt_cursor_impl*)cur);
     if (robj == NULL)
         return NULL;
-    if (tree->bitops(-(tree->key_nbits + 1), uobj + tree->key_offset,
-        robj + tree->key_offset) == -1)
+    if (tree->bitops(-(tree->key_nbits + 1), (char*)uobj + tree->key_offset,
+        (char*)robj + tree->key_offset) == -1)
         return robj;
     return NULL;
 }
@@ -695,8 +698,8 @@ static _noinline void *tree_step(c3bt_tree_impl *tree, c3bt_cursor_impl *cur,
         while (CHILD_IS_NODE(lower)) {
             if (cell->N[lower].cbit >= cur_cbit)
                 break;
-            bit = tree->bitops(cell->N[lower].cbit, uobj + tree->key_offset,
-                NULL);
+            bit = tree->bitops(cell->N[lower].cbit,
+                (char*)uobj + tree->key_offset, NULL);
             if (bit != dir)
                 upper = lower;
             lower = cell->N[lower].child[bit];
@@ -840,14 +843,14 @@ static uint cell_find_split(c3bt_cell *cell, int *bitmap)
  * Split a full cell in two.  New cell will become original cell's sub-cell.
  * Return the new cell pointer.
  */
-static c3bt_cell *cell_split(c3bt_cell *cell)
+static bool cell_split(c3bt_cell *cell)
 {
     c3bt_cell *new_cell;
     int i, n, p, cid, new_root, count, bitmap = 0;
 
     new_cell = cell_malloc();
     if (new_cell == NULL)
-        return NULL;
+        return false;
 
     new_root = cell_find_split(cell, &bitmap);
     count = 0;
@@ -880,13 +883,58 @@ static c3bt_cell *cell_split(c3bt_cell *cell)
     cell_free_node(new_cell, new_root);
     new_cell->pnc = cell_make_pnc(cell, count);
     cell_reparent_subs(new_cell, new_cell);
-    return new_cell;
+    return true;
+}
+
+/*
+ * Try to push down a node from a full cell.
+ */
+static bool cell_push_down(c3bt_cell *cell)
+{
+    int n, np, c, sibling, old_root, new_ptr;
+    c3bt_cell *sub;
+
+    for (n = 0; n < CELL_MAX_NODES; n++) {
+        if (cell_node_is_vacant(cell, n))
+            continue;
+        for (c = 0; c < 2; c++) {
+            /* Only edge nodes can be pushed down. */
+            if (CHILD_IS_CELL(cell->N[n].child[c])
+                && !CHILD_IS_NODE(cell->N[n].child[1 - c])) {
+                sub = cell->P[cell->N[n].child[c] & INDEX_MASK];
+                sibling = cell->N[n].child[1 - c];
+                /* Only plush down when sub has at least 2 vacancies. */
+                if (cell_ncount(sub) < CELL_MAX_NODES - 1) {
+                    old_root = cell_alloc_node(sub);
+                    new_ptr = cell_alloc_ptr(sub);
+                    cell_inc_ncount(sub, 1);
+                    np = cell_node_parent(cell, n);
+                    cell->N[np >> 1].child[np & 1] = cell->N[n].child[c];
+                    sub->N[old_root] = sub->N[0];
+                    sub->P[new_ptr] = cell->P[sibling & INDEX_MASK];
+                    sub->N[0].cbit = cell->N[n].cbit;
+                    sub->N[0].child[c] = old_root;
+                    sub->N[0].child[1 - c] = (sibling & FLAGS_MASK) | new_ptr;
+                    if (CHILD_IS_CELL(sibling))
+                        cell_set_parent(sub->P[new_ptr], sub);
+                    cell_free_node(cell, n);
+                    cell_free_ptr(cell, sibling & INDEX_MASK);
+                    cell_dec_ncount(cell, 1);
+#ifdef C3BT_STATS
+                    c3bt_stat_pushdowns++;
+#endif
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 /*
  * Add an user object to the tree.
  *
- * Return true if successful; false if key already exists (or no memory).
+ * Return true if successful; false if user object exists (or no memory).
  */
 bool c3bt_add(c3bt_tree *c3bt, void *uobj)
 {
@@ -918,12 +966,12 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
         goto done;
     }
 
-    robj = tree_lookup(tree, uobj + tree->key_offset, NULL);
-    cbit_nr = tree->bitops(-(tree->key_nbits + 1), uobj + tree->key_offset,
-        robj + tree->key_offset);
+    robj = tree_lookup(tree, (char*)uobj + tree->key_offset, NULL);
+    cbit_nr = tree->bitops(-(tree->key_nbits + 1),
+        (char*)uobj + tree->key_offset, (char*)robj + tree->key_offset);
     if (cbit_nr == -1)
         return false;
-    bit = tree->bitops(cbit_nr, uobj + tree->key_offset, NULL);
+    bit = tree->bitops(cbit_nr, (char*)uobj + tree->key_offset, NULL);
 
     /* Add to singleton. */
     if (tree->n_objects == 1) {
@@ -945,7 +993,8 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
         if (cell->N[lower].cbit > cbit_nr)
             break;
         upper = lower;
-        dir = tree->bitops(cell->N[lower].cbit, uobj + tree->key_offset, NULL);
+        dir = tree->bitops(cell->N[lower].cbit, (char*)uobj + tree->key_offset,
+            NULL);
         lower = cell->N[lower].child[dir];
         if (CHILD_IS_CELL(lower)) {
             cell = cell->P[lower & INDEX_MASK];
@@ -954,7 +1003,11 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
     }
     /* Split the cell if full. */
     if (cell_ncount(cell) == CELL_MAX_NODES) {
-        if (cell_split(cell) == NULL)
+        /* Try to push down a node first. It's cheaper. */
+        if (cell_push_down(cell))
+            goto next;
+        /* Then we have to split. */
+        if (!cell_split(cell))
             return false;
 #ifdef C3BT_STATS
         c3bt_stat_cells++;
@@ -1141,7 +1194,7 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
             tree->n_objects--;
             return true;
         } else {
-            /* Cell would turn incomplete; should be merged up then free-ed. */
+            /* Cell would turn incomplete; should be pushed up then free-ed. */
             if (parent == NULL) {
                 tree->root = loc.cell->P[sibling & INDEX_MASK];
                 if (tree->root != NULL)
@@ -1158,7 +1211,7 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
             cell_free(loc.cell);
 #ifdef C3BT_STATS
             c3bt_stat_cells--;
-            c3bt_stat_merges++;
+            c3bt_stat_pushups++;
 #endif
             tree->n_objects--;
             return true;
