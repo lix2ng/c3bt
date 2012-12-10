@@ -6,6 +6,8 @@ Take Crit-Bit Tree (as CBT hereafter), squeeze the nodes into cache line sized
 cells, and we get C3BT.  So if you like, you may read C3BT as "Cache-Conscious
 Crit-Bit Tree".
 
+Don't know what a CBT is?  Look here: http://http://cr.yp.to/critbit.html
+
 In the 32-bit standard layout, each cell is 64B and contains up to 8 crit-bit
 nodes.  It can index keys up to 256 bits long.  The 64-bit version (TODO) uses
 128B cells each can hold 9 nodes and supports 64K bits keys.
