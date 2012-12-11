@@ -2,33 +2,39 @@ C3BT: Compact Clustered Crit-Bit Tree
 
 Introduction
 ------------
-Take Crit-Bit Tree (as CBT hereafter), squeeze the nodes into cache line sized
+Take Crit-Bit Tree (as CBT hereafter), squeeze the nodes into cache-line sized
 cells, and we get C3BT.  So if you like, you may read C3BT as "Cache-Conscious
 Crit-Bit Tree".
 
 Don't know what a CBT is?  Look here: http://cr.yp.to/critbit.html
 
-In the 32-bit standard layout, each cell is 64B and contains up to 8 crit-bit
-nodes.  It can index keys up to 256 bits long.  The 64-bit version (TODO) uses
-128B cells each can hold 9 nodes and supports 64K bits keys.
+In the 32-bit standard layout, each cell is 64 bytes and contains up to 8 crit-
+bit nodes.  It can index keys up to 256 bits long.  The LP64 version (TODO) uses
+128 byte cells each can hold 9 nodes and supports 64K-bit keys.
 
 C3BT also extends the functionality of CBT.  Its API should be familiar to
-binary search tree users and the key is not limited to string or bit-string; it
-supports common key data types with correct ordering.  You may easily extend the
-data types by writing a custom "bitops" -- like a comparator to a BST.
+binary search tree users: INIT, DESTROY, ADD, REMOVE, FIND, FIRST, LAST, NEXT,
+and PREV.  Keys can be fixed-length bit-string, zero-terminated string, 32 and
+64 bit integers signed and unsigned, all with native ordering.  Custom or
+composite key data types can be supported by a custom "bitops" -- like a
+comparator to a BST.
 
 Most implementations of BST embed index nodes in user objects, but C3BT (like
 CBT) is a separate index, you add/remove user objects by reference.  This is due
-to the nature of CBT: each node bisects the remaining value space by a crit-bit,
-rather than using the key as a separator to bisect the key set like a BST does.
-But since it's clustered in a cache friendly way, you get both performance and
-flexibility:
+to the nature of CBT: each node bisects the remaining _key_value_space_ by a
+crit-bit number, rather than using a key as separator to bisect the remaining
+_key_set_ like a BST does.  A standalone binary tree may not be known for good
+memory efficiency, but since C3BT clusters its nodes in cache-line sized cells,
+you get efficiency, performance and flexibility:
 
     - Memory allocation overhead of the index is low.
     - Index access is fast.
     - User objects are not diluted by index; this can make a difference if user
-      object is small. 
+      object is small.
     - Index can be created and destroyed dynamically and freely.
+
+Besides, C3BT uses parent pointer on the cell level but not in the nodes.  This
+speeds up iteration with little cost of space.
 
 The author hopes C3BT can help popularize CBT as an alternative to BSTs, T-Tree
 and in-memory B-Tree.  CBT works on the fundamental representation of data, and
@@ -36,11 +42,19 @@ playing with bits is fun.
 
 Build
 -----
+This version supports only GCC on 32-bit linux.
+
 Just type "make". There are 3 files: c3bt.h, c3bt.c and c3bt-main.c.  The first
 two are meant to be dropped in your project, and the third is an ugly ad-hoc
 tester.
 
-This version supports only GCC and 32-bit linux.
+The code is shipped with statistics enabled.  If you don't need it, undefine
+C3BT_STATS in c3bt.h.
+
+If all you need is an associative array, you may define C3BT_FEATURE_MIN to
+reduce code size.  You can lookup an user object by a key value; you can still
+iterate through the set, but the ordering may be wrong.  You need to treat your
+keys as bit-strings in this case.
 
 Quick User Guide
 ----------------
