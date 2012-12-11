@@ -1,15 +1,15 @@
 /*
  * C3BT: Compact Clustered Crit-Bit Tree
  *
- * Terms of Use
+ * Copyright (c) 2012 Ling LI <lix2ng@gmail.com>
  *
- *  1.  You do not need to mention your use of this code, but when you do, call
- *      it "C3BT".
- *  2.  You may use this code for any purpose in any way.  However the author
- *      disclaims liability for any consequence caused by this code itself or
- *      any larger work that incorporates it.
- *
- *  Copyright 2012 Ling LI <lix2ng@gmail.com>
+ * TERMS OF USE:
+ *   1. Do not remove the copyright notice above and this terms of use.
+ *   2. You do not need to mention your use of this code, but when you do,
+ *      call it "C3BT".
+ *   3. This code is provided "as is" and the author disclaims liability for
+ *      any consequence caused by this code itself or any larger work that
+ *      incorporates it.
  */
 
 #include <assert.h>
@@ -834,7 +834,6 @@ static uint cell_find_split(c3bt_cell *cell, int *bitmap)
             alt_bmp = *bitmap;
         }
     }
-    assert(alt != -1);
     *bitmap = alt_bmp;
     return alt;
 }
@@ -1001,7 +1000,7 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
             goto next;
         }
     }
-    /* Split the cell if full. */
+    /* Make room for a full cell. */
     if (cell_ncount(cell) == CELL_MAX_NODES) {
         /* Try to push down a node first. It's cheaper. */
         if (cell_push_down(cell))
@@ -1018,6 +1017,7 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
 
     new_node = cell_alloc_node(cell);
     new_ptr = cell_alloc_ptr(cell);
+    cell_inc_ncount(cell, 1);
     cell->P[new_ptr] = uobj;
     if (upper == INVALID_NODE) {
         /* Insert as cell root. */
@@ -1025,14 +1025,12 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
         lower = new_node;
         new_node = 0;
     }
-
     /* Insert between upper and lower. */
     cell->N[new_node].cbit = cbit_nr;
     if (upper != INVALID_NODE)
         cell->N[upper].child[dir] = new_node;
     cell->N[new_node].child[bit] = new_ptr | CHILD_UOBJ_BIT;
     cell->N[new_node].child[1 - bit] = lower;
-    cell_inc_ncount(cell, 1);
 
     done:
 
@@ -1186,7 +1184,6 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
             cell_free_node(loc.cell, sibling);
         } else if (CHILD_IS_UOBJ(sibling) && parent == NULL) {
             /* Turn to singleton tree. */
-            assert(tree->n_objects==2);
             loc.cell->P[0] = loc.cell->P[sibling & INDEX_MASK];
             loc.cell->P[1] = NULL;
             loc.cell->N[0].child[0] = CHILD_UOBJ_BIT | 0;

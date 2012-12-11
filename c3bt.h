@@ -1,15 +1,15 @@
 /*
  * C3BT: Compact Clustered Crit-Bit Tree
  *
- * Terms of Use
+ * Copyright (c) 2012 Ling LI <lix2ng@gmail.com>
  *
- *  1.  You do not need to mention your use of this code, but when you do, call
- *      it "C3BT".
- *  2.  You may use this code for any purpose in any way.  However the author
- *      disclaims liability for any consequence caused by this code itself or
- *      any larger work that incorporates it.
- *
- *  Copyright 2012 Ling LI <lix2ng@gmail.com>
+ * TERMS OF USE:
+ *   1. Do not remove the copyright notice above and this terms of use.
+ *   2. You do not need to mention your use of this code, but when you do,
+ *      call it "C3BT".
+ *   3. This code is provided "as is" and the author disclaims liability for
+ *      any consequence caused by this code itself or any larger work that
+ *      incorporates it.
  */
 
 #ifndef _C3BT_H_
@@ -33,10 +33,10 @@ typedef unsigned char bool;
 extern uint c3bt_stat_cells; /* numbers of cells in use. */
 extern uint c3bt_stat_pushdowns; /* node push-down operations. */
 extern uint c3bt_stat_splits; /* cell split operations. */
-extern uint c3bt_stat_pushups; /* up-merge incomplete cells. */
-extern uint c3bt_stat_mergeups; /* explicit upwards cell merges. */
-extern uint c3bt_stat_mergedowns; /* explicit downwards cell merges. */
-extern uint c3bt_stat_failed_merges; /* unsuccessful explicit merges. */
+extern uint c3bt_stat_pushups; /* up-merge of incomplete cells. */
+extern uint c3bt_stat_mergeups; /* upwards cell merges. */
+extern uint c3bt_stat_mergedowns; /* downwards cell merges. */
+extern uint c3bt_stat_failed_merges; /* unsuccessful merge attempts. */
 /*
  * Count of cells grouped by occupancy. [0] to [7] represent number of cells
  * with 1~8 nodes respectively. Note: for ease of implementation, this data is
