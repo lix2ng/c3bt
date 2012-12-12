@@ -23,14 +23,14 @@ Most implementations of BST embed index nodes in user objects, but C3BT (like
 CBT) is a separate index, you add/remove user objects by reference.  This is due
 to the nature of CBT: each node bisects the remaining _key_value_space_ by a
 crit-bit number, rather than using a key as separator to bisect the remaining
-_key_set_ like a BST does.  A standalone binary tree may not be known for good
-memory efficiency, but since C3BT clusters its nodes in cache-line sized cells,
-you get efficiency, performance and flexibility:
+_key_set_ like a BST does.  A standard binary tree may not be known for good
+memory efficiency or reference locality, but since C3BT clusters its nodes in
+cache-line sized cells, you get efficiency, performance and flexibility:
 
-    - Memory allocation overhead of the index is low.
+    - Memory allocation is per-cell; overhead is low.
     - Index access is fast.
     - User objects are not diluted by index; this can make a difference if user
-      object is small.
+      object is small and densely stored.
     - Index can be created and destroyed dynamically and freely.
 
 Besides, C3BT uses parent pointer on the cell level but not in the nodes.  This
@@ -53,12 +53,55 @@ C3BT_STATS in c3bt.h.
 
 If all you need is an associative array, you may define C3BT_FEATURE_MIN to
 reduce code size.  You can lookup an user object by a key value; you can still
-iterate through the set, but the ordering may be wrong.  You need to treat your
-keys as bit-strings in this case.
+iterate through the set, but the ordering is likely wrong.  You need to treat
+your keys as bit-strings in this case.
 
-Quick User Guide
-----------------
-<<to be continued>>
+Usage
+-----
+C3BT can be used in two ways, hence two init functions are provided.  One is
+c3bt_init() where you specify the key's data type, offset in your object and its
+length.  The other, c3bt_init_bitops(), allows you to install a bitops function
+to support custom key types.  All the details about the key, including its
+source of bits and length are handled by the bitops function.
+
+After initialization, you may use c3bt_add() to add some user objects, or
+c3bt_remove() to remove them.  Again, these are all by reference: "add" won't
+create or copy a object and "remove" won't free any.
+
+Once you have some objects in the tree, there are various c3bt_find() functions
+that can be used to find an object by key value, and c3bt_first(), c3bt_last(),
+c3bt_next() and c3bt_prev() can help iterate through all the objects that are
+indexed in the tree.
+
+Bitops
+------
+Bitops, meaning "bit operations", is a function specific to a key type.  Its job
+is to answer three kinds of queries about the key:
+
+ 1. Get bit: what is the key's bit value at position N?
+ 2. Crit-bit: given two keys, which bit is the first bit where they differ?  Or,
+    how long is their common prefix?
+ 3. Equality test: are the two keys equal?
+
+Query #3 is covered by #2 because if we can't find a differing bit (up to the
+maximum key length), the keys are equal.  So bitops needs to implement two
+functions: get_bit and crit_bit.
+
+The prototype is defined as:
+    int bitops(int req, void *key1, void *key2);
+
+"req" is the request number.  When req>=0, it's a get_bit query.  Bitops should
+return the bit at position "req" of key1.  Key2 is ignored.
+
+If req<0, it's a crit_bit query.  Bitops should find the differing bit and
+return its position.  If such a bit can't be found, return -1 to report they are
+equal.  The maximum number of bits to be compared can be derived from (-req-1).
+
+Bit index is numbered in "written order", that is, the order that you would
+write it on paper.  E.g., for 32-bit integer, MSB is bit #0 and LSB is bit #31;
+for a string, character at byte offset n's MSB is #n*8, and its LSB is #n*8+7.
+You may call it pure big-endian.
+
 
 # vim: set et ts=4 tw=80 spell spl=en_us:
 
