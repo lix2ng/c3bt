@@ -23,6 +23,9 @@ typedef unsigned char bool;
 #define true    1
 #define false   0
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*
  * Enable this to get statistics data of C3BT internals.
  * Note: these are global stats, not per-tree.
@@ -38,11 +41,12 @@ extern uint c3bt_stat_mergeups; /* upwards cell merges. */
 extern uint c3bt_stat_mergedowns; /* downwards cell merges. */
 extern uint c3bt_stat_failed_merges; /* unsuccessful merge attempts. */
 /*
- * Count of cells grouped by occupancy. [0] to [7] represent number of cells
- * with 1~8 nodes respectively. Note: for ease of implementation, this data is
- * collected during tree_destroy(); so it's an autopsy.
+ * Count of cells grouped by occupancy. [0] to [7] hold number of cells with 1~8
+ * nodes respectively. Note: for ease of implementation, this data is collected
+ * during tree_destroy(); so it's an autopsy.
  */
-extern uint c3bt_stat_popdist[8];
+#define NODES_PER_CELL  8
+extern uint c3bt_stat_popdist[NODES_PER_CELL];
 #endif
 
 /*
@@ -71,12 +75,26 @@ extern uint c3bt_stat_popdist[8];
 #define C3BT_WITH_FLOATS
 #endif
 
+/* 
+ * The opaque version of the tree structure.
+ *
+ * For details please check c3bt_tree_impl in the source.
+ */
 typedef struct c3bt_tree {
-    void *_opaque1[2];
-    int _opaque2[3];
+    void *opaque1[2];
+    int opaque2[3];
 } c3bt_tree;
 
-typedef uint64_t c3bt_cursor;
+/*
+ * The opaque version of cursor.
+ *
+ * Cursor is an internal coordination to indicate an user object's position.
+ * It's used in iteration.  Don't modify it directly.
+ */
+typedef struct c3bt_cursor {
+    void *opaque1;
+    int16_t opaque2[2];
+} c3bt_cursor;
 
 enum c3bt_key_datatypes {
     /* BITS: fixed-length bit string. */
@@ -94,38 +112,152 @@ enum c3bt_key_datatypes {
     C3BT_KDT_CUSTOM,
 };
 
-/* Initialization etc. */
-bool c3bt_init(c3bt_tree *tree, uint kdt, uint koffset, uint kbits);
-bool c3bt_init_bitops(c3bt_tree *tree, int (*bitops)(int, void *, void *));
-bool c3bt_destroy(c3bt_tree *tree);
-uint c3bt_nobjects(c3bt_tree *tree);
+/*
+ * Tree initialization with a common data type.
+ *
+ * kdt - key data type, see c3bt_key_datatypes.
+ * koffset - byte offset of the key inside user object.
+ * kbits - length (in bits) of the key.
+ * Return true if successful.
+ *
+ * If kdt is an integer type, kbits is ignored, so you may specify "0".  For
+ * string type, you may also give a 0, meaning "best effort" and effectively it
+ * is set to maximum supported length; otherwise kbits is respected faithfully.
+ * Bit string must have an exact length.
+ */
+extern bool c3bt_init(c3bt_tree *tree, uint kdt, uint koffset, uint kbits);
 
-/* Manipulations. */
-bool c3bt_add(c3bt_tree *tree, void *uobj);
-bool c3bt_remove(c3bt_tree *tree, void *uobj);
+/*
+ * Tree initialization with a custom bitops function.
+ *
+ * Return true if successful.
+ *
+ * Internal key data type is set to C3BT_KDT_CUSTOM; koffset is 0.  The custom
+ * bitops function takes the whole user object as input.
+ */
+extern bool c3bt_init_bitops(c3bt_tree *tree,
+    int (*bitops)(int, void *, void *));
 
-/* Find user object by key value. */
-void *c3bt_find_bits(c3bt_tree *tree, uint8_t *key);
+/*
+ * Free all cells and uproot the tree.  If C3BT_STATS is defined, it also
+ * census population distribution of the cells.
+ *
+ * Return true if successful.
+ */
+extern bool c3bt_destroy(c3bt_tree *tree);
+
+/*
+ * Get the number of user objects being indexed by the tree.
+ *
+ * Return 0 if tree is null.
+ */
+extern uint c3bt_nobjects(c3bt_tree *tree);
+
+/*
+ * Add an user object to the C3BT index.
+ *
+ * Return true if successful; false if user object exists (or no memory).
+ */
+extern bool c3bt_add(c3bt_tree *tree, void *uobj);
+
+/*
+ * Remove an user object from the C3BT index.
+ *
+ * Return true if successful; false if user object doesn't exist.
+ */
+extern bool c3bt_remove(c3bt_tree *tree, void *uobj);
+
+/*
+ * Find bit string key by value.
+ *
+ * Return the user object pointer when found, otherwise NULL.  Note that the
+ * length of bit-string is fixed during c3bt_init.
+ */
+extern void *c3bt_find_bits(c3bt_tree *tree, uint8_t *key);
 
 #ifdef C3BT_WITH_STRING
-void *c3bt_find_str(c3bt_tree *tree, char *key);
+/*
+ * Find a zero-terminated string by value.
+ *
+ * Return the user object pointer when found, otherwise NULL.   This one
+ * supports both STR and PSTR.
+ */
+extern void *c3bt_find_str(c3bt_tree *tree, char *key);
 #endif
 
 #ifdef C3BT_WITH_INTS
-void *c3bt_find_u32(c3bt_tree *tree, uint32_t key);
-void *c3bt_find_s32(c3bt_tree *tree, int32_t key);
-void *c3bt_find_u64(c3bt_tree *tree, uint64_t key);
-void *c3bt_find_s64(c3bt_tree *tree, int64_t key);
+/*
+ * Find an integer key by value.
+ *
+ * Return the user object pointer when found, otherwise NULL.  Be sure to use a
+ * function that matches the key data type, e.g., if a tree is initialized with
+ * C3BT_KDT_U32, c3bt_find_s32() won't work (NULL is returned all the time).
+ */
+extern void *c3bt_find_u32(c3bt_tree *tree, uint32_t key);
+extern void *c3bt_find_s32(c3bt_tree *tree, int32_t key);
+extern void *c3bt_find_u64(c3bt_tree *tree, uint64_t key);
+extern void *c3bt_find_s64(c3bt_tree *tree, int64_t key);
 #endif
 
-/* Functions that can be used to start iteration. */
-void *c3bt_locate(c3bt_tree *tree, void *uobj, c3bt_cursor *cur);
-void *c3bt_first(c3bt_tree *tree, c3bt_cursor *cur);
-void *c3bt_last(c3bt_tree *tree, c3bt_cursor *cur);
+/*
+ * Locate an user object in the tree.
+ *
+ * Check if an user object exists in the tree, and if true, return a pointer to
+ * it and a cursor (if cur is not NULL), which is useful for further iteration.
+ * If the user object is not in the tree, NULL is returned and cursor becomes
+ * invalid.
+ *
+ * Find-by-value is not supported for custom bitops, so this function can be
+ * used instead.
+ *
+ * Note: the search is "by value", i.e., the returned object would have the same
+ * valued key as the input object, not necessarily itself.
+ */
+extern void *c3bt_locate(c3bt_tree *tree, void *uobj, c3bt_cursor *cur);
 
-/* Iteration functions. */
-void *c3bt_next(c3bt_tree *tree, c3bt_cursor *cur);
-void *c3bt_prev(c3bt_tree *tree, c3bt_cursor *cur);
+/*
+ * Return the user object with lowest order in a tree.
+ *
+ * Return a pointer and set the cursor (if cur is not NULL) to the object whth
+ * lowest order in the tree.  NULL is returned if tree is empty and cursor
+ * becomes undefined.
+ */
+extern void *c3bt_first(c3bt_tree *tree, c3bt_cursor *cur);
+
+/*
+ * Return the user object with highest order in a tree.
+ *
+ * Return a pointer and set the cursor (if cur is not NULL) to the object with
+ * highest order in the tree.  NULL is returned if tree is empty and cursor
+ * becomes undefined.
+ */
+extern void *c3bt_last(c3bt_tree *tree, c3bt_cursor *cur);
+
+/*
+ * Return next valued user object.
+ *
+ * Return the next higher ordered user object relative to the cursor, and the
+ * cursor is updated accordingly.  cur must be a valid cursor.
+ *
+ * NULL is returned if current location has no successor, tree is empty, or
+ * singleton.
+ */
+extern void *c3bt_next(c3bt_tree *tree, c3bt_cursor *cur);
+
+/*
+ * Return previous valued user object.
+ *
+ * Return the next lower ordered user object relative to the cursor, and the
+ * cursor is updated accordingly.  cur must be a valid cursor.
+ *
+ * NULL is returned if current location has no predecessor, tree is empty, or
+ * singleton.
+ */
+extern void *c3bt_prev(c3bt_tree *tree, c3bt_cursor *cur);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /*_C3BT_H_*/
 

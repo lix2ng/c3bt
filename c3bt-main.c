@@ -74,7 +74,7 @@ int main()
     }
     c3bt_destroy(&tree);
     printf("Population distribution:\n");
-    for (i = 0; i < 8; i++)
+    for (i = 0; i < NODES_PER_CELL; i++)
         printf("cells with %d nodes: %d\n", i + 1, c3bt_stat_popdist[i]);
     free(array);
     return 0;

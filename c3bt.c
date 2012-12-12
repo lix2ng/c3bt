@@ -189,9 +189,6 @@ bool _osize c3bt_init(c3bt_tree *c3bt, uint kdt, uint koffset, uint kbits)
     return true;
 }
 
-/*
- * Tree initialization with a custom bitops function.
- */
 bool c3bt_init_bitops(c3bt_tree *c3bt, int (*bitops)(int, void *, void *))
 {
     c3bt_tree_impl *tree;
@@ -333,15 +330,13 @@ static c3bt_cell *cell_delist_subcell(c3bt_cell *cell)
 }
 
 #ifdef C3BT_STATS
-void cell_update_popdist(c3bt_cell *cell)
+static void cell_update_popdist(c3bt_cell *cell)
 {
     int n = cell_ncount(cell) - 1;
     c3bt_stat_popdist[n]++;
 }
 #endif
-/*
- * Free all cells and uproot the tree.
- */
+
 bool c3bt_destroy(c3bt_tree *c3bt)
 {
     c3bt_cell *head, *next, *del, *tmp;
@@ -446,9 +441,6 @@ static void *tree_lookup(c3bt_tree_impl *tree, void *key, c3bt_cursor_impl *cur)
  * Find-by-value functions.
  */
 
-/*
- * Note that the length of bit-string is fixed in the tree structure.
- */
 void *c3bt_find_bits(c3bt_tree *c3bt, uint8_t *key)
 {
     void *robj;
@@ -534,9 +526,6 @@ void *c3bt_find_s64(c3bt_tree *c3bt, int64_t key)
 }
 #endif
 
-/*
- * This one supports both STR and PSTR.
- */
 #ifdef C3BT_WITH_STRING
 void *c3bt_find_str(c3bt_tree *c3bt, char *key)
 {
@@ -570,11 +559,6 @@ void *c3bt_find_str(c3bt_tree *c3bt, char *key)
 }
 #endif
 
-/*
- * Check if an user object is in the tree, and if true, return a pointer to
- * the found object and a cursor for further iteration.  Otherwise NULL is
- * returned and cursor is invalid.
- */
 void *c3bt_locate(c3bt_tree *c3bt, void *uobj, c3bt_cursor *cur)
 {
     void *robj;
@@ -653,10 +637,6 @@ static _noinline void *tree_extreme(c3bt_tree_impl *tree, c3bt_cursor *cur,
     return robj;
 }
 
-/*
- * Return pointer and cursor to the object which lowest order in the tree.
- * NULL is returned if tree is empty.
- */
 void *c3bt_first(c3bt_tree *c3bt, c3bt_cursor *cur)
 {
     return tree_extreme((c3bt_tree_impl*)c3bt, cur, 0);
@@ -729,17 +709,11 @@ static _noinline void *tree_step(c3bt_tree_impl *tree, c3bt_cursor_impl *cur,
     }
 }
 
-/*
- * Return previous valued user object.
- */
 void *c3bt_prev(c3bt_tree *c3bt, c3bt_cursor *cur)
 {
     return tree_step((c3bt_tree_impl*)c3bt, (c3bt_cursor_impl*)cur, 0);
 }
 
-/*
- * Return next valued user object.
- */
 void *c3bt_next(c3bt_tree *c3bt, c3bt_cursor *cur)
 {
     return tree_step((c3bt_tree_impl*)c3bt, (c3bt_cursor_impl*)cur, 1);
@@ -768,7 +742,7 @@ static _noinline int cell_node_parent(c3bt_cell *cell, int node)
 }
 
 /*
- * Set a cell's all sub-cells' new parent.
+ * Set a cell's all sub-cells' parent.
  */
 static _noinline void cell_reparent_subs(c3bt_cell *cell, c3bt_cell *parent)
 {
@@ -840,7 +814,6 @@ static uint cell_find_split(c3bt_cell *cell, int *bitmap)
 
 /*
  * Split a full cell in two.  New cell will become original cell's sub-cell.
- * Return the new cell pointer.
  */
 static bool cell_split(c3bt_cell *cell)
 {
@@ -930,11 +903,6 @@ static bool cell_push_down(c3bt_cell *cell)
     return false;
 }
 
-/*
- * Add an user object to the tree.
- *
- * Return true if successful; false if user object exists (or no memory).
- */
 bool c3bt_add(c3bt_tree *c3bt, void *uobj)
 {
     c3bt_tree_impl *tree;
@@ -1156,9 +1124,7 @@ static void cell_merge_down(c3bt_cell *cell, c3bt_cell *parent, c3bt_cell *sub,
     return;
 }
 #endif
-/*
- * Remove an user object from the tree.
- */
+
 bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
 {
     c3bt_tree_impl *tree;
