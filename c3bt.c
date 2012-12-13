@@ -255,7 +255,7 @@ static bool cell_node_is_vacant(c3bt_cell *cell, int nid)
     return cell->N[nid].child[0] == INVALID_NODE;
 }
 
-static _noinline uint cell_alloc_node(c3bt_cell *cell)
+static uint cell_alloc_node(c3bt_cell *cell)
 {
     int i;
 
@@ -265,7 +265,7 @@ static _noinline uint cell_alloc_node(c3bt_cell *cell)
     return i;
 }
 
-static _noinline uint cell_alloc_ptr(c3bt_cell *cell)
+static uint cell_alloc_ptr(c3bt_cell *cell)
 {
     int i;
 
@@ -725,7 +725,7 @@ void *c3bt_next(c3bt_tree *c3bt, c3bt_cursor *cur)
  * Let P be the parent of node N.  This function returns 2*P if N is P's left
  * child, or 2*P+1 if it's the right child.
  */
-static _noinline int cell_node_parent(c3bt_cell *cell, int node)
+static int cell_node_parent(c3bt_cell *cell, int node)
 {
     int n, c;
 
@@ -744,7 +744,7 @@ static _noinline int cell_node_parent(c3bt_cell *cell, int node)
 /*
  * Set a cell's all sub-cells' parent.
  */
-static _noinline void cell_reparent_subs(c3bt_cell *cell, c3bt_cell *parent)
+static void cell_reparent_subs(c3bt_cell *cell, c3bt_cell *parent)
 {
     c3bt_cell *sub;
     uint8_t *p;
@@ -1010,7 +1010,7 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
  * Find the anchor point (return as nid<<1|cid) in parent cell.
  * Note: cell must not be the root cell.
  */
-static _noinline int cell_find_anchor(c3bt_cell *cell, c3bt_cell *parent)
+static int cell_find_anchor(c3bt_cell *cell, c3bt_cell *parent)
 {
     int i;
     uint nid, cid;
@@ -1076,8 +1076,8 @@ static void cell_merge_up(c3bt_cell *cell, c3bt_cell *parent)
  * Merge a cell into one of its sub-cell.
  */
 #ifdef C3BT_ENABLE_MERGE_DOWN
-static void cell_merge_down(c3bt_cell *cell, c3bt_cell *parent, c3bt_cell *sub,
-    int s_anchor)
+static void cell_merge_down(c3bt_cell *cell, c3bt_cell *parent,
+    c3bt_cell *sub, int s_anchor)
 {
     int anchor, i, j, child, old_root, new_node2, new_ptr;
 
