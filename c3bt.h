@@ -50,8 +50,8 @@ extern uint c3bt_stat_popdist[NODES_PER_CELL];
 #endif
 
 /*
- * Try merging an underpopulated cell into one of its sub-cells. It's a bit
- * expensive yet has marginal effect, hence disabled by default.
+ * Try merging an underpopulated cell into one of its sub-cells. It has marginal
+ * effect hence disabled by default.
  */
 #undef C3BT_ENABLE_MERGE_DOWN
 
@@ -120,10 +120,10 @@ enum c3bt_key_datatypes {
  * kbits - length (in bits) of the key.
  * Return true if successful.
  *
- * If kdt is an integer type, kbits is ignored, so you may specify "0".  For
- * string type, you may also give a 0, meaning "best effort" and effectively it
- * is set to maximum supported length; otherwise kbits is respected faithfully.
- * Bit string must have an exact length.
+ * If kdt is an integer type, kbits is ignored, so you may just give a 0.  For
+ * string type, you may also specify 0, meaning "best effort" and effectively it
+ * is set to maximum supported length; otherwise values will be respected
+ * faithfully.  Bit strings must have an exact, non-zero length.
  */
 extern bool c3bt_init(c3bt_tree *tree, uint kdt, uint koffset, uint kbits);
 
@@ -207,18 +207,17 @@ extern void *c3bt_find_s64(c3bt_tree *tree, int64_t key);
  * If the user object is not in the tree, NULL is returned and cursor becomes
  * invalid.
  *
- * Find-by-value is not supported for custom bitops, so this function can be
- * used instead.
+ * When using custom bitops, this function is the euiqvlent of "find-by-value".
  *
- * Note: the search is "by value", i.e., the returned object would have the same
- * valued key as the input object, not necessarily itself.
+ * Note: the search is "by value", which mean the returned object would have the
+ * same valued key as the input object, not necessarily itself.
  */
 extern void *c3bt_locate(c3bt_tree *tree, void *uobj, c3bt_cursor *cur);
 
 /*
  * Return the user object with lowest order in a tree.
  *
- * Return a pointer and set the cursor (if cur is not NULL) to the object whth
+ * Return a pointer and set the cursor (if cur is not NULL) to the object with
  * lowest order in the tree.  NULL is returned if tree is empty and cursor
  * becomes undefined.
  */
