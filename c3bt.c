@@ -306,25 +306,20 @@ static void cell_free(c3bt_cell *cell)
  */
 static c3bt_cell *cell_delist_subcell(c3bt_cell *cell)
 {
-    int i, tmp;
-    uint8_t *p;
+    int n, c, tmp;
 
     if (cell == NULL)
         return NULL;
 
-    p = (uint8_t*)cell->N;
-    for (i = 0; i < CELL_MAX_NODES * 3; i++) {
-        if (i % 3 == 0)
+    for (n = 0; n < CELL_MAX_NODES; n++) {
+        if (cell_node_is_vacant(cell, n))
             continue;
-        if (p[i] == INVALID_NODE) {
-            i += 2;
-            continue;
-        }
-        if (CHILD_IS_CELL(p[i])) {
-            tmp = p[i] & INDEX_MASK;
-            p[i] = 0;
-            return cell->P[tmp];
-        }
+        for (c = 0; c < 2; c++)
+            if (CHILD_IS_CELL(cell->N[n].child[c])) {
+                tmp = cell->N[n].child[c] & INDEX_MASK;
+                cell->N[n].child[c] = 0;
+                return cell->P[tmp];
+            }
     }
     return NULL;
 }
@@ -747,21 +742,16 @@ static int cell_node_parent(c3bt_cell *cell, int node)
 static void cell_reparent_subs(c3bt_cell *cell, c3bt_cell *parent)
 {
     c3bt_cell *sub;
-    uint8_t *p;
-    int i;
+    int n, c;
 
-    p = (uint8_t*)cell->N;
-    for (i = 0; i < CELL_MAX_NODES * 3; i++) {
-        if (i % 3 == 0)
+    for (n = 0; n < CELL_MAX_NODES; n++) {
+        if (cell_node_is_vacant(cell, n))
             continue;
-        if (p[i] == INVALID_NODE) {
-            i += 2;
-            continue;
-        }
-        if (CHILD_IS_CELL(p[i])) {
-            sub = cell->P[p[i] & INDEX_MASK];
-            cell_set_parent(sub, parent);
-        }
+        for (c = 0; c < 2; c++)
+            if (CHILD_IS_CELL(cell->N[n].child[c])) {
+                sub = cell->P[cell->N[n].child[c] & INDEX_MASK];
+                cell_set_parent(sub, parent);
+            }
     }
 }
 
