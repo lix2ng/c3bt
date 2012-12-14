@@ -40,6 +40,7 @@ extern uint c3bt_stat_pushups; /* up-merge of incomplete cells. */
 extern uint c3bt_stat_mergeups; /* upwards cell merges. */
 extern uint c3bt_stat_mergedowns; /* downwards cell merges. */
 extern uint c3bt_stat_failed_merges; /* unsuccessful merge attempts. */
+
 /*
  * Count of cells grouped by occupancy. [0] to [7] hold number of cells with 1~8
  * nodes respectively. Note: for ease of implementation, this data is collected
@@ -207,7 +208,7 @@ extern void *c3bt_find_s64(c3bt_tree *tree, int64_t key);
  * If the user object is not in the tree, NULL is returned and cursor becomes
  * invalid.
  *
- * When using custom bitops, this function is the euiqvlent of "find-by-value".
+ * When using custom bitops, this function is the equivalent of "find-by-value".
  *
  * Note: the search is "by value", which mean the returned object would have the
  * same valued key as the input object, not necessarily itself.

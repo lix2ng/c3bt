@@ -106,7 +106,7 @@ write it on paper.  For example, 32-bit integers' MSB is bit #0 and LSB is bit
 #31; for a string, character at byte offset n's MSB is #n*8, and its LSB is
 #n*8+7.  You may call it pure big-endian.
 
-Bitops are called frequently, especially the get_bit query.  You should make it
+Bitops is called frequently, especially the get_bit query.  You should make it
 as short and fast as possible.  If you plan to use only one key type, you may
 consider inlining it to eliminate the function call overhead.
 
