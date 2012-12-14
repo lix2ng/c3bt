@@ -114,6 +114,7 @@ uint c3bt_stat_pushups;
 uint c3bt_stat_mergeups;
 uint c3bt_stat_mergedowns;
 uint c3bt_stat_failed_merges;
+uint c3bt_stat_shortcuts;
 uint c3bt_stat_popdist[CELL_MAX_NODES];
 #endif
 
@@ -864,7 +865,7 @@ static bool cell_push_down(c3bt_cell *cell)
             if (CHILD_IS_CELL(cell->N[n].child[c])
                 && !CHILD_IS_NODE(cell->N[n].child[1 - c])) {
                 sub = cell->P[cell->N[n].child[c] & INDEX_MASK];
-                /* Only plush down when sub has at least 2 vacancies. */
+                /* Only push down when sub has at least 2 vacancies. */
                 if (cell_ncount(sub) < CELL_MAX_NODES - 1) {
                     sibling = cell->N[n].child[1 - c];
                     old_root = cell_alloc_node(sub);
@@ -896,10 +897,10 @@ static bool cell_push_down(c3bt_cell *cell)
 bool c3bt_add(c3bt_tree *c3bt, void *uobj)
 {
     c3bt_tree_impl *tree;
+    c3bt_cursor_impl cur;
     c3bt_cell *cell;
     void *robj;
     int cbit_nr, bit, new_node, new_ptr, upper, lower, dir = 0;
-
     if (c3bt == NULL || uobj == NULL)
         return false;
 
@@ -922,8 +923,7 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
 #endif
         goto done;
     }
-
-    robj = tree_lookup(tree, (char*)uobj + tree->key_offset, NULL);
+    robj = tree_lookup(tree, (char*)uobj + tree->key_offset, &cur);
     cbit_nr = tree->bitops(-(tree->key_nbits + 1),
         (char*)uobj + tree->key_offset, (char*)robj + tree->key_offset);
     if (cbit_nr == -1)
@@ -938,8 +938,18 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
         tree->root->N[0].child[1 - bit] = CHILD_UOBJ_BIT | 0;
         goto done;
     }
-
-    /* Find proper location for new node. */
+    /* Shortcut if no need to search from root. */
+    if (cbit_nr > cur.cell->N[cur.nid].cbit) {
+        c3bt_stat_shortcuts++;
+        cell = cur.cell;
+        upper = cur.nid;
+        dir = cur.cid;
+        lower = cell->N[upper].child[dir];
+        if (cell_ncount(cell) == CELL_MAX_NODES)
+            goto make_room;
+        goto do_insert;
+    }
+    /* Find location for new node (from tree root). */
     cell = tree->root;
 
     next:
@@ -958,8 +968,10 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
             goto next;
         }
     }
+
     /* Make room for a full cell. */
     if (cell_ncount(cell) == CELL_MAX_NODES) {
+        make_room:
         /* Try to push down a node first. It's cheaper. */
         if (cell_push_down(cell))
             goto next;
@@ -972,6 +984,8 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
 #endif
         goto next;
     }
+
+    do_insert:
 
     new_node = cell_alloc_node(cell);
     new_ptr = cell_alloc_ptr(cell);
@@ -1147,7 +1161,7 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
             tree->n_objects--;
             return true;
         } else {
-            /* Cell would turn incomplete; should be pushed up then free-ed. */
+            /* Cell is becoming incomplete; it must be pushed up then free-ed. */
             if (parent == NULL) {
                 tree->root = loc.cell->P[sibling & INDEX_MASK];
                 if (tree->root != NULL)
@@ -1179,10 +1193,10 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
     cell_dec_ncount(loc.cell, 1);
     tree->n_objects--;
 
-    /* Try merging up to parent. */
+    /* No need to merge? */
     if (cell_ncount(loc.cell) >= CELL_MIN_NODES)
         return true;
-
+    /* Try merging up to parent. */
     if (parent != NULL
         && cell_ncount(loc.cell) + cell_ncount(parent) <= CELL_MAX_NODES) {
         cell_merge_up(loc.cell, parent);
