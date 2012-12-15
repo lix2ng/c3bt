@@ -38,7 +38,6 @@ extern uint c3bt_stat_pushdowns; /* node push-down operations. */
 extern uint c3bt_stat_splits; /* cell split operations. */
 extern uint c3bt_stat_pushups; /* up-merge of incomplete cells. */
 extern uint c3bt_stat_mergeups; /* upwards cell merges. */
-extern uint c3bt_stat_failed_merges; /* unsuccessful merge attempts. */
 
 /*
  * Count of cells grouped by occupancy. [0] to [7] hold number of cells with 1~8

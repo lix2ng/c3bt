@@ -734,7 +734,7 @@ static int cell_node_parent(c3bt_cell *cell, int node)
     }
     done:
 
-    return n * 2 + c;
+    return n << 1 | c;
 }
 
 /*
@@ -1132,32 +1132,15 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
     cell_dec_ncount(loc.cell, 1);
     tree->n_objects--;
 
-    /*
-     * Since we expect a node has no less than CELL_MIN_NODES nodes, there's
-     * no need to try nodes with more than (CELL_MAX_NODES - CELL_MIN_NODES).
-     */
-    if (cell_ncount(loc.cell) > CELL_MAX_NODES - CELL_MIN_NODES)
-        return true;
     /* Try merging up to parent. */
     if (parent != NULL
         && cell_ncount(loc.cell) + cell_ncount(parent) <= CELL_MAX_NODES) {
         cell_merge_up(loc.cell, parent);
 #ifdef C3BT_STATS
         c3bt_stat_mergeups++;
+        c3bt_stat_cells--;
 #endif
-        goto merge_done;
     }
-    /* Record a merge failure. */
-#ifdef C3BT_STATS
-    c3bt_stat_failed_merges++;
-#endif
-    return true;
-
-    merge_done:
-
-#ifdef C3BT_STATS
-    c3bt_stat_cells--;
-#endif
     return true;
 }
 

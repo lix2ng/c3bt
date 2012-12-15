@@ -7,9 +7,9 @@
 void print_stats(c3bt_tree* tree)
 {
     printf("%d uobjs in %d cells, %d pushdowns %d splits %d pushups "
-        "%d merges %d fails.\n", c3bt_nobjects(tree), c3bt_stat_cells,
+        "%d merges.\n", c3bt_nobjects(tree), c3bt_stat_cells,
         c3bt_stat_pushdowns, c3bt_stat_splits, c3bt_stat_pushups,
-        c3bt_stat_mergeups, c3bt_stat_failed_merges);
+        c3bt_stat_mergeups);
 }
 
 void clear_stats()
@@ -18,7 +18,6 @@ void clear_stats()
     c3bt_stat_splits = 0;
     c3bt_stat_pushups = 0;
     c3bt_stat_mergeups = 0;
-    c3bt_stat_failed_merges = 0;
 }
 
 int main()
