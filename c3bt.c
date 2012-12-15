@@ -738,25 +738,6 @@ static int cell_node_parent(c3bt_cell *cell, int node)
 }
 
 /*
- * Set a cell's all sub-cells' parent.
- */
-static void cell_reparent_subs(c3bt_cell *cell, c3bt_cell *parent)
-{
-    c3bt_cell *sub;
-    int n, c;
-
-    for (n = 0; n < CELL_MAX_NODES; n++) {
-        if (cell_node_is_vacant(cell, n))
-            continue;
-        for (c = 0; c < 2; c++)
-            if (CHILD_IS_CELL(cell->N[n].child[c])) {
-                sub = cell->P[cell->N[n].child[c] & INDEX_MASK];
-                cell_set_parent(sub, parent);
-            }
-    }
-}
-
-/*
  * Find a split point for a fully populated cell.  Return the would-be new
  * cell-root and a bitmap representing the nodes need to be moved.
  */
@@ -1036,13 +1017,42 @@ static int cell_find_anchor(c3bt_cell *cell, c3bt_cell *parent)
     return nid << 1 | cid;
 }
 
+static int cell_copy_ptr(c3bt_cell *src, c3bt_cell *dest, int child)
+{
+    int pid, new_ptr;
+
+    new_ptr = cell_alloc_ptr(dest);
+    pid = child & INDEX_MASK;
+    dest->P[new_ptr] = src->P[pid];
+    if (CHILD_IS_CELL(child))
+        cell_set_parent(src->P[pid], dest);
+    return (child & FLAGS_MASK) | new_ptr;
+}
+
+static int cell_copy_node(c3bt_cell *src, c3bt_cell *dest, int nid)
+{
+    int c, child, new_node;
+
+    new_node = cell_alloc_node(dest);
+    cell_inc_ncount(dest, 1);
+    dest->N[new_node].cbit = src->N[nid].cbit;
+    for (c = 0; c < 2; c++) {
+        child = src->N[nid].child[c];
+        if (CHILD_IS_NODE(child))
+            dest->N[new_node].child[c] = cell_copy_node(src, dest, child);
+        else
+            dest->N[new_node].child[c] = cell_copy_ptr(src, dest, child);
+    }
+    return new_node;
+}
+
 /*
  * Merge a cell into its parent cell.
- * cell must have no more than 2 nodes.
+ * (Recursive)
  */
 static void cell_merge_up(c3bt_cell *cell, c3bt_cell *parent)
 {
-    int anchor, i, j, child, new_node, new_node2, new_ptr;
+    int anchor, c, child, new_node;
 
     anchor = cell_find_anchor(cell, parent);
     cell_free_ptr(parent,
@@ -1050,85 +1060,17 @@ static void cell_merge_up(c3bt_cell *cell, c3bt_cell *parent)
     new_node = cell_alloc_node(parent);
     cell_inc_ncount(parent, 1);
     parent->N[anchor >> 1].child[anchor & 1] = new_node;
-    cell_reparent_subs(cell, parent);
-
     parent->N[new_node].cbit = cell->N[0].cbit;
-    for (i = 0; i < 2; i++) {
-        child = cell->N[0].child[i];
-        if (CHILD_IS_NODE(child)) {
-            new_node2 = cell_alloc_node(parent);
-            cell_inc_ncount(parent, 1);
-            parent->N[new_node].child[i] = new_node2;
-            parent->N[new_node2].cbit = cell->N[child].cbit;
-            for (j = 0; j < 2; j++) {
-                new_ptr = cell_alloc_ptr(parent);
-                parent->P[new_ptr] = cell->P[cell->N[child].child[j]
-                    & INDEX_MASK];
-                parent->N[new_node2].child[j] = (cell->N[child].child[j]
-                    & FLAGS_MASK) | new_ptr;
-            }
-        } else {
-            new_ptr = cell_alloc_ptr(parent);
-            parent->P[new_ptr] = cell->P[child & INDEX_MASK];
-            parent->N[new_node].child[i] = (child & FLAGS_MASK) | new_ptr;
-        }
+    for (c = 0; c < 2; c++) {
+        child = cell->N[0].child[c];
+        if (CHILD_IS_NODE(child))
+            parent->N[new_node].child[c] = cell_copy_node(cell, parent, child);
+        else
+            parent->N[new_node].child[c] = cell_copy_ptr(cell, parent, child);
     }
     cell_free(cell);
     return;
 }
-
-/*
- * Merge a cell into one of its sub-cell.
- */
-#ifdef C3BT_ENABLE_MERGE_DOWN
-static void cell_merge_down(c3bt_cell *cell, c3bt_cell *parent,
-    c3bt_cell *sub, int s_anchor)
-{
-    int anchor, i, j, child, old_root, new_node2, new_ptr;
-
-    cell_reparent_subs(cell, sub);
-    cell_set_parent(sub, parent);
-    if (parent != NULL) {
-        /* Caller shall handle parent==NULL case. */
-        anchor = cell_find_anchor(cell, parent);
-        parent->P[parent->N[anchor >> 1].child[anchor & 1] & INDEX_MASK] = sub;
-    }
-    old_root = cell_alloc_node(sub);
-    cell_inc_ncount(sub, 1);
-    sub->N[old_root] = sub->N[0];
-    sub->N[0].cbit = cell->N[0].cbit;
-    for (i = 0; i < 2; i++) {
-        child = cell->N[0].child[i];
-        if (CHILD_IS_NODE(child)) {
-            new_node2 = cell_alloc_node(sub);
-            cell_inc_ncount(sub, 1);
-            sub->N[0].child[i] = new_node2;
-            sub->N[new_node2].cbit = cell->N[child].cbit;
-            for (j = 0; j < 2; j++) {
-                if ((child << 1 | j) == s_anchor) {
-                    sub->N[new_node2].child[j] = old_root;
-                } else {
-                    new_ptr = cell_alloc_ptr(sub);
-                    sub->P[new_ptr] = cell->P[cell->N[child].child[j]
-                    & INDEX_MASK];
-                    sub->N[new_node2].child[j] = (cell->N[child].child[j]
-                        & FLAGS_MASK) | new_ptr;
-                }
-            }
-        } else {
-            if (i == s_anchor) {
-                sub->N[0].child[i] = old_root;
-            } else {
-                new_ptr = cell_alloc_ptr(sub);
-                sub->P[new_ptr] = cell->P[child & INDEX_MASK];
-                sub->N[0].child[i] = (child & FLAGS_MASK) | new_ptr;
-            }
-        }
-    }
-    cell_free(cell);
-    return;
-}
-#endif
 
 bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
 {
@@ -1137,10 +1079,6 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
     c3bt_cell *parent;
     uint8_t *pap;
     int n, sibling, anchor;
-#ifdef C3BT_ENABLE_MERGE_DOWN
-    c3bt_cell *sub;
-    int c;
-#endif
 
     if (c3bt_locate(c3bt, uobj, (c3bt_cursor*)&loc) == NULL)
         return false;
@@ -1194,8 +1132,11 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
     cell_dec_ncount(loc.cell, 1);
     tree->n_objects--;
 
-    /* No need to merge? */
-    if (cell_ncount(loc.cell) >= CELL_MIN_NODES)
+    /*
+     * Since we expect a node has no less than CELL_MIN_NODES nodes, there's
+     * no need to try nodes with more than (CELL_MAX_NODES - CELL_MIN_NODES).
+     */
+    if (cell_ncount(loc.cell) > CELL_MAX_NODES - CELL_MIN_NODES)
         return true;
     /* Try merging up to parent. */
     if (parent != NULL
@@ -1206,29 +1147,7 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
 #endif
         goto merge_done;
     }
-
-#ifdef C3BT_ENABLE_MERGE_DOWN
-    /* Try merging down to a sub-cell. */
-    for (n = 0; n < CELL_MAX_NODES; n++) {
-        if (cell_node_is_vacant(loc.cell, n))
-        continue;
-        for (c = 0; c < 2; c++) {
-            if (CHILD_IS_CELL(loc.cell->N[n].child[c])) {
-                sub = loc.cell->P[loc.cell->N[n].child[c] & INDEX_MASK];
-                if (cell_ncount(loc.cell) + cell_ncount(sub) <= CELL_MAX_NODES) {
-                    cell_merge_down(loc.cell, parent, sub, n << 1 | c);
-                    if (parent == NULL)
-                    tree->root = sub;
-#ifdef C3BT_STATS
-                    c3bt_stat_mergedowns++;
-#endif
-                    goto merge_done;
-                }
-            }
-        }
-    }
-#endif
-    /* All attempts fail, give up. */
+    /* Record a merge failure. */
 #ifdef C3BT_STATS
     c3bt_stat_failed_merges++;
 #endif

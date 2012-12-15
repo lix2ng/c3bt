@@ -7,9 +7,9 @@
 void print_stats(c3bt_tree* tree)
 {
     printf("%d uobjs in %d cells, %d pushdowns %d splits %d pushups "
-        "%d/%d merges %d fails.\n", c3bt_nobjects(tree), c3bt_stat_cells,
+        "%d merges %d fails.\n", c3bt_nobjects(tree), c3bt_stat_cells,
         c3bt_stat_pushdowns, c3bt_stat_splits, c3bt_stat_pushups,
-        c3bt_stat_mergeups, c3bt_stat_mergedowns, c3bt_stat_failed_merges);
+        c3bt_stat_mergeups, c3bt_stat_failed_merges);
 }
 
 void clear_stats()
@@ -18,7 +18,6 @@ void clear_stats()
     c3bt_stat_splits = 0;
     c3bt_stat_pushups = 0;
     c3bt_stat_mergeups = 0;
-    c3bt_stat_mergedowns = 0;
     c3bt_stat_failed_merges = 0;
 }
 
@@ -32,7 +31,8 @@ int main()
     int *robj;
     struct timespec t_start, t_end;
 
-    srand(time(NULL) - 1354856137);
+//    srand(time(NULL) - 1354856137);
+//    srand(77);
     for (i = 0; i < ASIZE; i++)
 //        array[i] = rand();
         array[i] = i * 7;

@@ -38,7 +38,6 @@ extern uint c3bt_stat_pushdowns; /* node push-down operations. */
 extern uint c3bt_stat_splits; /* cell split operations. */
 extern uint c3bt_stat_pushups; /* up-merge of incomplete cells. */
 extern uint c3bt_stat_mergeups; /* upwards cell merges. */
-extern uint c3bt_stat_mergedowns; /* downwards cell merges. */
 extern uint c3bt_stat_failed_merges; /* unsuccessful merge attempts. */
 
 /*
@@ -49,12 +48,6 @@ extern uint c3bt_stat_failed_merges; /* unsuccessful merge attempts. */
 #define NODES_PER_CELL  8
 extern uint c3bt_stat_popdist[NODES_PER_CELL];
 #endif
-
-/*
- * Try merging an underpopulated cell into one of its sub-cells. It has marginal
- * effect hence disabled by default.
- */
-#undef C3BT_ENABLE_MERGE_DOWN
 
 /* Feature configurations. */
 #define C3BT_FEATURE_MAX
