@@ -825,6 +825,8 @@ static bool cell_split(c3bt_cell *cell)
         for (cid = 0; cid < 2; cid++) {
             p = cell->N[i].child[cid];
             if (!CHILD_IS_NODE(p)) {
+                if (CHILD_IS_CELL(p))
+                    cell_set_parent(cell->P[p & INDEX_MASK], new_cell);
                 p &= INDEX_MASK;
                 new_cell->P[p] = cell->P[p];
                 cell_free_ptr(cell, p);
@@ -845,7 +847,6 @@ static bool cell_split(c3bt_cell *cell)
     new_cell->N[0] = new_cell->N[new_root];
     cell_free_node(new_cell, new_root);
     new_cell->pnc = cell_make_pnc(cell, count);
-    cell_reparent_subs(new_cell, new_cell);
     return true;
 }
 
