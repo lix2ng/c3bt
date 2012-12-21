@@ -1,7 +1,7 @@
 all: c3bt
 
 CC = gcc
-CFLAGS = -pipe -Wall -Wpadded -std=gnu99 -pedantic -O3
+CFLAGS = -pipe -Wall -Wpadded -std=gnu99 -fno-stack-protector -pedantic -Os
 LFLAGS = -lrt
 
 OBJS = c3bt.o c3bt-main.o
