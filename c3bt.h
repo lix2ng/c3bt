@@ -26,6 +26,8 @@ typedef unsigned char bool;
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define NODES_PER_CELL  8
 /*
  * Enable this to get statistics data of C3BT internals.
  * Note: these are global stats, not per-tree.
@@ -44,7 +46,6 @@ extern uint c3bt_stat_mergeups; /* upwards cell merges. */
  * nodes respectively. Note: for ease of implementation, this data is collected
  * during tree_destroy(); so it's an autopsy.
  */
-#define NODES_PER_CELL  8
 extern uint c3bt_stat_popdist[NODES_PER_CELL];
 #endif
 
