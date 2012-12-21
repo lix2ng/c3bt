@@ -906,35 +906,33 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
         tree->root->N[0].child[1 - bit] = CHILD_UOBJ_BIT | 0;
         goto done;
     }
-    /* Shortcut if no need to search from root. */
+    /* Find insertion point. */
     if (cbit_nr > cur.cell->N[cur.nid].cbit) {
+        /* Shortcut if no need to search from root. */
         lower = cur.cell->N[cur.nid].child[cur.cid];
-        if (cell_ncount(cur.cell) == NODES_PER_CELL)
-            goto make_room;
-        goto do_insert;
-    }
-    /* Find location for new node (from tree root). */
-    cur.cell = tree->root;
+    } else {
+        /* Find location for new node (from tree root). */
+        cur.cell = tree->root;
 
-    next:
+        next:
 
-    cur.nid = INVALID_NODE;
-    lower = 0;
-    while (!CHILD_IS_UOBJ(lower)) {
-        if (cur.cell->N[lower].cbit > cbit_nr)
-            break;
-        cur.nid = lower;
-        cur.cid = tree->bitops(cur.cell->N[lower].cbit,
-            (char*)uobj + tree->key_offset, NULL);
-        lower = cur.cell->N[lower].child[cur.cid];
-        if (CHILD_IS_CELL(lower)) {
-            cur.cell = cur.cell->P[lower & INDEX_MASK];
-            goto next;
+        cur.nid = INVALID_NODE;
+        lower = 0;
+        while (!CHILD_IS_UOBJ(lower)) {
+            if (cur.cell->N[lower].cbit > cbit_nr)
+                break;
+            cur.nid = lower;
+            cur.cid = tree->bitops(cur.cell->N[lower].cbit,
+                (char*)uobj + tree->key_offset, NULL);
+            lower = cur.cell->N[lower].child[cur.cid];
+            if (CHILD_IS_CELL(lower)) {
+                cur.cell = cur.cell->P[lower & INDEX_MASK];
+                goto next;
+            }
         }
     }
     /* Make room for a full cell. */
     if (cell_ncount(cur.cell) == NODES_PER_CELL) {
-        make_room:
         /* Try to push down a node first. It's cheaper. */
         if (cell_push_down(cur.cell))
             goto next;
@@ -947,9 +945,6 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
 #endif
         goto next;
     }
-
-    do_insert:
-
     new_node = cell_alloc_node(cur.cell);
     new_ptr = cell_alloc_ptr(cur.cell);
     cell_inc_ncount(cur.cell, 1);
