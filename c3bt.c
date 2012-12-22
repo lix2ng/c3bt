@@ -329,8 +329,7 @@ bool c3bt_destroy(c3bt_tree *c3bt)
 
     if (c3bt == NULL)
         return false;
-    /*
-     * Iterative Post-order Traversal of N-way Tree With Delayed Node Access.
+    /* Iterative Post-order Traversal of N-way Tree With Delayed Node Access.
      */
     head = ((c3bt_tree_impl*)c3bt)->root;
     del = NULL;
@@ -650,8 +649,7 @@ static _noinline void *tree_step(c3bt_tree_impl *tree, c3bt_cursor_impl *cur,
     /* The easy case: the other sibling is on the desired path. */
     if (cur->cid != dir)
         goto down;
-    /*
-     * The hard case: find an ancestor from where we can rush down.
+    /* The hard case: find an ancestor from where we can rush down.
      * Climbing up is cell by cell using the parent pointer; within each
      * cell it's key-guided descent.
      */
@@ -759,10 +757,8 @@ static uint cell_find_split(c3bt_cell *cell, int *bitmap)
                 }
         }
         /* First choice: 4+4. */
-        if (count == 3) {
-//        if (count >= 2 && count <= 4) {
+        if (count == 3)
             return i;
-        }
         /* Second choice: 3+5. */
         if (count == 2 || count == 4) {
             alt = i;
@@ -992,61 +988,7 @@ static int cell_find_anchor(c3bt_cell *cell, c3bt_cell *parent)
 
     return nid << 1 | cid;
 }
-#if 0
-static int cell_copy_ptr(c3bt_cell *src, c3bt_cell *dest, int child)
-{
-    int pid, new_ptr;
 
-    new_ptr = cell_alloc_ptr(dest);
-    pid = child & INDEX_MASK;
-    dest->P[new_ptr] = src->P[pid];
-    if (CHILD_IS_CELL(child))
-    cell_set_parent(src->P[pid], dest);
-    return (child & FLAGS_MASK) | new_ptr;
-}
-
-static int cell_copy_node(c3bt_cell *src, c3bt_cell *dest, int nid)
-{
-    int c, child, new_node;
-
-    new_node = cell_alloc_node(dest);
-    cell_inc_ncount(dest, 1);
-    dest->N[new_node].cbit = src->N[nid].cbit;
-    for (c = 0; c < 2; c++) {
-        child = src->N[nid].child[c];
-        if (CHILD_IS_NODE(child))
-        dest->N[new_node].child[c] = cell_copy_node(src, dest, child);
-        else
-        dest->N[new_node].child[c] = cell_copy_ptr(src, dest, child);
-    }
-    return new_node;
-}
-
-/*
- * Merge a cell into its parent cell.
- * (Recursive)
- */
-static void cell_merge_up(c3bt_cell *cell, c3bt_cell *parent, int anchor)
-{
-    int c, child, new_node;
-
-    cell_free_ptr(parent,
-        parent->N[anchor >> 1].child[anchor & 1] & INDEX_MASK);
-    new_node = cell_alloc_node(parent);
-    cell_inc_ncount(parent, 1);
-    parent->N[anchor >> 1].child[anchor & 1] = new_node;
-    parent->N[new_node].cbit = cell->N[0].cbit;
-    for (c = 0; c < 2; c++) {
-        child = cell->N[0].child[c];
-        if (CHILD_IS_NODE(child))
-        parent->N[new_node].child[c] = cell_copy_node(cell, parent, child);
-        else
-        parent->N[new_node].child[c] = cell_copy_ptr(cell, parent, child);
-    }
-    cell_free(cell);
-    return;
-}
-#else
 /*
  * Merge a cell into its parent cell.
  *
@@ -1104,7 +1046,6 @@ static void cell_merge_up(c3bt_cell *cell, c3bt_cell *parent, int anchor)
     parent->N[anchor >> 1].child[anchor & 1] = full_stack[0];
     cell_free(cell);
 }
-#endif
 
 bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
 {
@@ -1173,7 +1114,6 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
         cell_merge_up(loc.cell, parent, anchor);
         goto merge_done;
     }
-
     /* Try merging up a subcell. */
     for (n = 0; n < NODES_PER_CELL; n++) {
         if (cell_node_is_vacant(loc.cell, n))
@@ -1213,8 +1153,7 @@ static int bitops_bits(int req, void *key1, void*key2)
     if (req >= 0) {
         return ((uint8_t*)key1)[req / 8] & (0x80u >> (req % 8)) ? 1 : 0;
     } else {
-        /*
-         * For crit_bit request, req is passed with -(tree->key_nbits+1), hence
+        /* For crit_bit request, req is passed with -(tree->key_nbits+1), hence
          * -req-1 is tree->key_nbits, so we know how far to compare.
          */
         for (i = 0; i < (-req - 1 + 7) / 8; i++) {
@@ -1244,8 +1183,7 @@ static int bitops_str(int req, void *key1, void *key2)
         return p[req / 8] & (0x80u >> (req % 8)) ? 1 : 0;
     } else {
         q = (char*)key2;
-        /*
-         * Compare up to specified number of bits (exactly), if can't find a
+        /* Compare up to specified number of bits (exactly), if can't find a
          * differing bit, report they are equal.
          */
         for (i = 0; i < (-req - 1 + 7) / 8; i++) {
@@ -1278,8 +1216,7 @@ static int bitops_u32(int req, void *key1, void *key2)
         /* Return the requested bit in key1. */
         return bits & (0x80000000u >> req) ? 1 : 0;
     else {
-        /*
-         * Return the position of first differing bit, or -1 if the two keys
+        /* Return the position of first differing bit, or -1 if the two keys
          * are equal.
          */
         bits ^= *(uint32_t*)key2;
@@ -1295,8 +1232,7 @@ static int bitops_s32(int req, void *key1, void *key2)
 {
     uint32_t bits;
 
-    /*
-     * Shifting from [INT_MIN, INT_MAX] to [0, UINT_MAX] to maintain proper
+    /* Shifting from [INT_MIN, INT_MAX] to [0, UINT_MAX] to maintain proper
      * ordering for signed integers.  Subtraction and flipping MSB both will do.
      */
     bits = *(int32_t*)key1;
