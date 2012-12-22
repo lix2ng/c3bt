@@ -42,9 +42,9 @@ extern uint c3bt_stat_pushups; /* up-merge of incomplete cells. */
 extern uint c3bt_stat_mergeups; /* upwards cell merges. */
 
 /*
- * Count of cells grouped by occupancy. [0] to [7] hold number of cells with 1~8
- * nodes respectively. Note: for ease of implementation, this data is collected
- * during tree_destroy(); so it's an autopsy.
+ * Count of cells grouped by occupancy. [n] holds number of cells with n+1
+ * nodes.  Note: for ease of implementation, this data is collected during
+ * tree_destroy(); so it's an autopsy.
  */
 extern uint c3bt_stat_popdist[NODES_PER_CELL];
 #endif
@@ -126,8 +126,8 @@ extern bool c3bt_init(c3bt_tree *tree, uint kdt, uint koffset, uint kbits);
  *
  * Return true if successful.
  *
- * Internal key data type is set to C3BT_KDT_CUSTOM; koffset is 0.  The custom
- * bitops function takes the whole user object as input.
+ * Internal key data type is set to C3BT_KDT_CUSTOM and koffset is set to 0,
+ * which means custom bitops function takes the whole user object as input.
  */
 extern bool c3bt_init_bitops(c3bt_tree *tree,
     int (*bitops)(int, void *, void *));

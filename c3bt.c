@@ -133,7 +133,7 @@ bool _osize c3bt_init(c3bt_tree *c3bt, uint kdt, uint koffset, uint kbits)
     CT_ASSERT(sizeof(c3bt_tree) == sizeof(c3bt_tree_impl));
     CT_ASSERT(sizeof(c3bt_cursor) == sizeof(c3bt_cursor_impl));
 
-    if (c3bt == NULL)
+    if (!c3bt)
         return false;
     tree = (c3bt_tree_impl*)c3bt;
     memset(tree, 0, sizeof(c3bt_tree_impl));
@@ -184,7 +184,7 @@ bool c3bt_init_bitops(c3bt_tree *c3bt, int (*bitops)(int, void *, void *))
 {
     c3bt_tree_impl *tree;
 
-    if (c3bt == NULL || bitops == NULL)
+    if (!c3bt || !bitops)
         return false;
     tree = (c3bt_tree_impl*)c3bt;
     memset(tree, 0, sizeof(c3bt_tree_impl));
@@ -277,7 +277,7 @@ static c3bt_cell *cell_malloc(void)
     int i;
 
     cell = malloc(sizeof(c3bt_cell));
-    if (cell == NULL)
+    if (!cell)
         return NULL;
     assert(((intptr_t)cell & 7) == 0);
     memset(cell, 0, sizeof(c3bt_cell));
@@ -299,7 +299,7 @@ static c3bt_cell *cell_delist_subcell(c3bt_cell *cell)
 {
     int n, c, tmp;
 
-    if (cell == NULL)
+    if (!cell)
         return NULL;
 
     for (n = 0; n < NODES_PER_CELL; n++) {
@@ -335,14 +335,14 @@ bool c3bt_destroy(c3bt_tree *c3bt)
     del = NULL;
     while (head) {
         next = cell_delist_subcell(head);
-        if (next == NULL) {
+        if (!next) {
             cell_free(del);
             del = head;
 #ifdef C3BT_STATS
             cell_update_popdist(head);
 #endif
             next = cell_delist_subcell(cell_parent(head));
-            if (next == NULL) {
+            if (!next) {
                 while (cell_parent(head)) {
                     next = cell_parent(head);
                     cell_free(del);
@@ -370,7 +370,7 @@ bool c3bt_destroy(c3bt_tree *c3bt)
 
 uint c3bt_nobjects(c3bt_tree *tree)
 {
-    if (tree == NULL)
+    if (!tree)
         return 0;
     return (((c3bt_tree_impl*)tree)->n_objects);
 }
@@ -431,11 +431,11 @@ void *c3bt_find_bits(c3bt_tree *c3bt, uint8_t *key)
     void *robj;
     c3bt_tree_impl *tree = (c3bt_tree_impl*)c3bt;
 
-    if (key == NULL || tree == NULL || tree->key_type != C3BT_KDT_BITS)
+    if (!key || !tree || tree->key_type != C3BT_KDT_BITS)
         return NULL;
 
     robj = tree_lookup(tree, key, NULL);
-    if (robj == NULL)
+    if (!robj)
         return NULL;
     if (memcmp(key, (char*)robj + tree->key_offset, (tree->key_nbits + 7) / 8)
         == 0)
@@ -445,8 +445,7 @@ void *c3bt_find_bits(c3bt_tree *c3bt, uint8_t *key)
 
 #ifdef C3BT_WITH_INTS
 /* Common for all integers "find-by-value" functions. */
-static _noinline void *c3bt_find_integer(c3bt_tree *c3bt, uint64_t key,
-    uint kdt)
+static void *c3bt_find_integer(c3bt_tree *c3bt, uint64_t key, uint kdt)
 {
     union {
         uint32_t u32;
@@ -455,7 +454,7 @@ static _noinline void *c3bt_find_integer(c3bt_tree *c3bt, uint64_t key,
     void *robj;
     c3bt_tree_impl *tree = (c3bt_tree_impl*)c3bt;
 
-    if (tree == NULL || tree->key_type != kdt)
+    if (!tree || tree->key_type != kdt)
         return NULL;
 
     switch (kdt) {
@@ -470,7 +469,7 @@ static _noinline void *c3bt_find_integer(c3bt_tree *c3bt, uint64_t key,
     }
 
     robj = tree_lookup(tree, &bits, NULL);
-    if (robj == NULL)
+    if (!robj)
         return NULL;
     /* Faster than bitops. */
     switch (kdt) {
@@ -518,7 +517,7 @@ void *c3bt_find_str(c3bt_tree *c3bt, char *key)
     void *robj;
     c3bt_tree_impl *tree;
 
-    if (key == NULL || c3bt == NULL)
+    if (!key || !c3bt)
         return NULL;
 
     tree = (c3bt_tree_impl*)c3bt;
@@ -529,7 +528,7 @@ void *c3bt_find_str(c3bt_tree *c3bt, char *key)
         robj = tree_lookup(tree, key, NULL);
     else
         return NULL;
-    if (robj == NULL)
+    if (!robj)
         return NULL;
     if (tree->key_type == C3BT_KDT_PSTR) {
         if (strncmp(key, *(char**)((char*)robj + tree->key_offset),
@@ -549,13 +548,13 @@ void *c3bt_locate(c3bt_tree *c3bt, void *uobj, c3bt_cursor *cur)
     void *robj;
     c3bt_tree_impl *tree;
 
-    if (c3bt == NULL || uobj == NULL)
+    if (!c3bt || !uobj)
         return NULL;
 
     tree = (c3bt_tree_impl*)c3bt;
     robj = tree_lookup(tree, (char*)uobj + tree->key_offset,
         (c3bt_cursor_impl*)cur);
-    if (robj == NULL)
+    if (!robj)
         return NULL;
     if (tree->bitops(-(tree->key_nbits + 1), (char*)uobj + tree->key_offset,
         (char*)robj + tree->key_offset) == -1)
@@ -569,8 +568,8 @@ void *c3bt_locate(c3bt_tree *c3bt, void *uobj, c3bt_cursor *cur)
  *
  * Tree must have at least 2 uobjs.
  */
-static _noinline void *tree_rush_down(c3bt_tree_impl *tree,
-    c3bt_cursor_impl *start, int dir)
+static void *tree_rush_down(c3bt_tree_impl *tree, c3bt_cursor_impl *start,
+    int dir)
 {
     c3bt_cell *cell;
     int nid;
@@ -597,13 +596,12 @@ static _noinline void *tree_rush_down(c3bt_tree_impl *tree,
 /*
  * Go to either extreme of the tree.  Common code for first and last.
  */
-static _noinline void *tree_extreme(c3bt_tree_impl *tree, c3bt_cursor *cur,
-    int dir)
+static void *tree_extreme(c3bt_tree_impl *tree, c3bt_cursor *cur, int dir)
 {
     c3bt_cursor_impl start;
     void * robj;
 
-    if (tree == NULL || tree->root == NULL)
+    if (!tree || !tree->root)
         return NULL;
     start.cell = tree->root;
     start.nid = 0;
@@ -635,15 +633,14 @@ void *c3bt_last(c3bt_tree *c3bt, c3bt_cursor *cur)
 /*
  * Step a cursor backwards or forwards.  Common for next() and prev().
  */
-static _noinline void *tree_step(c3bt_tree_impl *tree, c3bt_cursor_impl *cur,
-    int dir)
+static void *tree_step(c3bt_tree_impl *tree, c3bt_cursor_impl *cur, int dir)
 {
     c3bt_cell *cell;
     void *uobj;
     int upper, lower, bit, cur_cbit;
 
     /* Nowhere to step if tree is null, empty or singleton. */
-    if (cur == NULL || tree == NULL || tree->n_objects < 2)
+    if (!cur || !tree || tree->n_objects < 2)
         return NULL;
 
     /* The easy case: the other sibling is on the desired path. */
@@ -656,7 +653,7 @@ static _noinline void *tree_step(c3bt_tree_impl *tree, c3bt_cursor_impl *cur,
     cur_cbit = cur->cell->N[cur->nid].cbit;
     cell = cur->cell;
     uobj = cell->P[cell->N[cur->nid].child[cur->cid] & INDEX_MASK];
-    while (cell != NULL) {
+    while (cell) {
         lower = 0;
         upper = INVALID_NODE;
         while (CHILD_IS_NODE(lower)) {
@@ -732,10 +729,9 @@ static int cell_node_parent(c3bt_cell *cell, int node)
 static uint cell_find_split(c3bt_cell *cell, int *bitmap)
 {
     uint8_t stack[NODES_PER_CELL - 2];
-    int i, top, cid, n, count, alt, alt_bmp;
+    int i, top, n, c, count, alt, alt_bmp;
 
-    alt = -1;
-    alt_bmp = 0;
+    alt = alt_bmp = 0; /* shut compiler up. */
     for (i = 1; i < NODES_PER_CELL; i++) {
         if (!CHILD_IS_NODE(cell->N[i].child[0])
             && !CHILD_IS_NODE(cell->N[i].child[1]))
@@ -750,9 +746,9 @@ static uint cell_find_split(c3bt_cell *cell, int *bitmap)
         while (top >= 0) {
             n = stack[top--];
             *bitmap |= 0x8000u >> n;
-            for (cid = 1; cid >= 0; cid--)
-                if (CHILD_IS_NODE(cell->N[n].child[cid])) {
-                    stack[++top] = cell->N[n].child[cid];
+            for (c = 1; c >= 0; c--)
+                if (CHILD_IS_NODE(cell->N[n].child[c])) {
+                    stack[++top] = cell->N[n].child[c];
                     count++;
                 }
         }
@@ -775,10 +771,10 @@ static uint cell_find_split(c3bt_cell *cell, int *bitmap)
 static bool cell_split(c3bt_cell *cell)
 {
     c3bt_cell *new_cell;
-    int i, n, p, cid, new_root, count, bitmap = 0;
+    int i, n, c, p, new_root, count, bitmap;
 
     new_cell = cell_malloc();
-    if (new_cell == NULL)
+    if (!new_cell)
         return false;
 
     new_root = cell_find_split(cell, &bitmap);
@@ -788,8 +784,8 @@ static bool cell_split(c3bt_cell *cell)
             continue;
         /* Copy node[i] and its ptr to new cell (same location) */
         new_cell->N[i] = cell->N[i];
-        for (cid = 0; cid < 2; cid++) {
-            p = cell->N[i].child[cid];
+        for (c = 0; c < 2; c++) {
+            p = cell->N[i].child[c];
             if (!CHILD_IS_NODE(p)) {
                 if (CHILD_IS_CELL(p))
                     cell_set_parent(cell->P[p & INDEX_MASK], new_cell);
@@ -867,13 +863,13 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
     void *robj;
     int cbit_nr, bit, new_node, new_ptr, lower;
 
-    if (c3bt == NULL || uobj == NULL)
+    if (!c3bt || !uobj)
         return false;
     tree = (c3bt_tree_impl*)c3bt;
     /* Empty -> singleton. */
-    if (tree->root == NULL) {
+    if (!tree->root) {
         cur.cell = cell_malloc();
-        if (cur.cell == NULL)
+        if (!cur.cell)
             return false;
         tree->root = cur.cell;
         cur.cell->N[0].child[0] = CHILD_UOBJ_BIT | 0;
@@ -1055,12 +1051,12 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
     uint8_t *pap;
     int n, c, sibling, anchor;
 
-    if (c3bt_locate(c3bt, uobj, (c3bt_cursor*)&loc) == NULL)
+    if (!c3bt_locate(c3bt, uobj, (c3bt_cursor*)&loc))
         return false;
     tree = (c3bt_tree_impl*)c3bt;
     parent = cell_parent(loc.cell);
     cell_free_ptr(loc.cell, loc.cell->N[loc.nid].child[loc.cid] & INDEX_MASK);
-    if (loc.nid == 0) {
+    if (!loc.nid) {
         /* Remove from cell root. */
         sibling = loc.cell->N[0].child[1 - loc.cid];
         if (CHILD_IS_NODE(sibling)) {
@@ -1076,9 +1072,9 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
             return true;
         } else {
             /* Cell is becoming incomplete; push up then free. */
-            if (parent == NULL) {
+            if (!parent) {
                 tree->root = loc.cell->P[sibling & INDEX_MASK];
-                if (tree->root != NULL)
+                if (tree->root)
                     cell_set_parent(tree->root, 0);
             } else {
                 anchor = cell_find_anchor(loc.cell, parent);
@@ -1108,8 +1104,7 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
     tree->n_objects--;
 
     /* Try merging up to parent. */
-    if (parent != NULL
-        && cell_ncount(loc.cell) + cell_ncount(parent) <= NODES_PER_CELL) {
+    if (parent && cell_ncount(loc.cell) + cell_ncount(parent) <= NODES_PER_CELL) {
         anchor = cell_find_anchor(loc.cell, parent);
         cell_merge_up(loc.cell, parent, anchor);
         goto merge_done;

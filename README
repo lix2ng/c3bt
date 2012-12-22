@@ -146,6 +146,9 @@ In the end, the cell fill factor and algorithm complexity of C3BT is comparable
 to in-memory B-Tree, but C3BT has higher density (measured by bytes/fanout) and
 very localized lookup (measured by cache-lines/lookup).
 
+On average C3BT in LP32 mode achieves 5.5 uobjs/cell.  Memory consumption can be
+estimated as: Nobj/5.5*64 (bytes).
+
 1. Lookup
 Lookup in C3BT is straightforward: start from tree root, check the bit value of
 key at the position indicated by current node's "cbit".  If it's 0, follow the
@@ -182,7 +185,7 @@ cell should be free-ed.  This may happen in cells at the lowest level.
 
 After the removal, C3BT merges the cell to increase fill factor.  First try is
 to merge the cell to its parent, then try to merge one of the cell's sub-cells
-into it.  On average C3BT in LP32 achieves 5.5 nodes/cell or 9.8 bytes/fanout.
+into it.
 
 # vim: set et ts=4 tw=80 spell spl=en_us:
 
