@@ -821,8 +821,7 @@ static bool cell_push_down(c3bt_cell *cell)
     c3bt_cell *sub;
 
     for (n = 1; n < NODES_PER_CELL; n++) {
-        if (cell_node_is_vacant(cell, n))
-            continue;
+        /* All nodes are taken, no need for vacancy test.*/
         for (c = 0; c < 2; c++) {
             /* Only edge nodes can be pushed down. */
             if (CHILD_IS_CELL(cell->N[n].child[c])
@@ -1068,8 +1067,7 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
             loc.cell->N[0].child[1] = CHILD_CELL_BIT | 1;
             loc.cell->P[0] = loc.cell->P[sibling & INDEX_MASK];
             loc.cell->P[1] = NULL;
-            tree->n_objects--;
-            return true;
+            goto done;
         } else {
             /* Cell is becoming incomplete; push up then free. */
             if (!parent) {
@@ -1090,8 +1088,7 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
             c3bt_stat_cells--;
             c3bt_stat_pushups++;
 #endif
-            tree->n_objects--;
-            return true;
+            goto done;
         }
     } else {
         /* Not from cell root. */
@@ -1101,7 +1098,6 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
         cell_free_node(loc.cell, loc.nid);
     }
     cell_dec_ncount(loc.cell, 1);
-    tree->n_objects--;
 
     /* Try merging up to parent. */
     if (parent && cell_ncount(loc.cell) + cell_ncount(parent) <= NODES_PER_CELL) {
@@ -1123,6 +1119,10 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
             }
         }
     }
+
+    done:
+
+    tree->n_objects--;
     return true;
 
     merge_done:
@@ -1131,8 +1131,7 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
     c3bt_stat_mergeups++;
     c3bt_stat_cells--;
 #endif
-
-    return true;
+    goto done;
 }
 
 /*
