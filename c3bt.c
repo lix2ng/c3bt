@@ -724,22 +724,23 @@ static int cell_node_parent(c3bt_cell *cell, int node)
 
 /*
  * Find a split point for a fully populated cell.  Return the would-be new
- * cell-root and a bitmap representing the nodes need to be moved.
+ * cell-root and a bitmap representing the nodes to be moved.
  */
 static uint cell_find_split(c3bt_cell *cell, int *bitmap)
 {
     uint8_t stack[NODES_PER_CELL - 2];
-    int i, top, n, c, count, alt, alt_bmp;
+    int i, top, n, c, count, ret_n, ret_bmp, offset;
 
-    alt = alt_bmp = 0; /* shut compiler up. */
-    for (i = 1; i < NODES_PER_CELL; i++) {
+    ret_n = ret_bmp = 0; /* shut compiler up. */
+    offset = NODES_PER_CELL;
+    for (i = NODES_PER_CELL - 1; i > 0; i--) {
         if (!CHILD_IS_NODE(cell->N[i].child[0])
             && !CHILD_IS_NODE(cell->N[i].child[1]))
             continue;
-        /* Pre-order traversal to count number of children of a node.  Cell-root
-         * and leaves are excluded; only 3~6 nodes to check.
+        /* Pre-order traversal to count nodes in a subtree.  Cell-root and edge
+         * nodes are excluded.
          */
-        count = 0;
+        count = 1;
         *bitmap = 0;
         stack[0] = i;
         top = 0;
@@ -752,17 +753,19 @@ static uint cell_find_split(c3bt_cell *cell, int *bitmap)
                     count++;
                 }
         }
-        /* First choice: 4+4. */
-        if (count == 3)
+        /* Calculate deviation from perfect split. */
+        c = count * 2 - NODES_PER_CELL;
+        c = __builtin_abs(c);
+        if (c <= NODES_PER_CELL % 2)
             return i;
-        /* Second choice: 3+5. */
-        if (count == 2 || count == 4) {
-            alt = i;
-            alt_bmp = *bitmap;
+        if (c < offset) {
+            offset = c;
+            ret_n = i;
+            ret_bmp = *bitmap;
         }
     }
-    *bitmap = alt_bmp;
-    return alt;
+    *bitmap = ret_bmp;
+    return ret_n;
 }
 
 /*
@@ -782,7 +785,7 @@ static bool cell_split(c3bt_cell *cell)
     for (i = 0; i < NODES_PER_CELL; i++) {
         if (!(bitmap & (0x8000u >> i)))
             continue;
-        /* Copy node[i] and its ptr to new cell (same location) */
+        /* Move node[i] and its children to new cell (same location) */
         new_cell->N[i] = cell->N[i];
         for (c = 0; c < 2; c++) {
             p = cell->N[i].child[c];
@@ -992,7 +995,7 @@ static int cell_find_anchor(c3bt_cell *cell, c3bt_cell *parent)
  * uses about 92B stack on x86 and 64B on ARM, which is a >70% reduction from
  * the recursive version under worst condition.
  */
-static void cell_merge_up(c3bt_cell *cell, c3bt_cell *parent, int anchor)
+static void cell_merge(c3bt_cell *cell, c3bt_cell *parent, int anchor)
 {
     int wtop, top, n, c, new_node, new_ptr;
     uint8_t work_stack[NODES_PER_CELL];
@@ -1102,7 +1105,7 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
     /* Try merging up to parent. */
     if (parent && cell_ncount(loc.cell) + cell_ncount(parent) <= NODES_PER_CELL) {
         anchor = cell_find_anchor(loc.cell, parent);
-        cell_merge_up(loc.cell, parent, anchor);
+        cell_merge(loc.cell, parent, anchor);
         goto merge_done;
     }
     /* Try merging up a subcell. */
@@ -1113,17 +1116,13 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
             if (CHILD_IS_CELL(loc.cell->N[n].child[c])) {
                 sub = loc.cell->P[loc.cell->N[n].child[c] & INDEX_MASK];
                 if (cell_ncount(loc.cell) + cell_ncount(sub) <= NODES_PER_CELL) {
-                    cell_merge_up(sub, loc.cell, n << 1 | c);
+                    cell_merge(sub, loc.cell, n << 1 | c);
                     goto merge_done;
                 }
             }
         }
     }
-
-    done:
-
-    tree->n_objects--;
-    return true;
+    goto done;
 
     merge_done:
 
@@ -1131,7 +1130,11 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
     c3bt_stat_mergeups++;
     c3bt_stat_cells--;
 #endif
-    goto done;
+
+    done:
+
+    tree->n_objects--;
+    return true;
 }
 
 /*
