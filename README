@@ -5,7 +5,7 @@ Introduction
 ------------
 
 Take Crit-Bit Tree (as CBT hereafter), squeeze the nodes into cache-line sized
-cells, and we get C3BT.  So if you like, you may read C3BT as "Cache-Conscious
+cells, and we get C3BT.  If you like, you may also read C3BT as "Cache-Conscious
 Crit-Bit Tree".
 
 Don't know what a CBT is?  Look here: http://cr.yp.to/critbit.html
@@ -48,7 +48,7 @@ playing with bits is fun.
 Build
 -----
 
-This version is tested under GCC on 32-bit linux.
+This version is tested under GCC on 32-bit Linux.
 
 Just type "make". There are 3 files: c3bt.h, c3bt.c and c3bt-main.c.  The first
 two are meant to be dropped in your project, and the third is an ugly ad-hoc
@@ -68,8 +68,7 @@ Usage
 C3BT can be used in two ways, hence two init functions are provided.  One is
 c3bt_init() where you specify the key's data type, offset in your object and its
 length.  The other, c3bt_init_bitops(), allows you to install a bitops function
-to support custom key types.  All the details about the key, including its
-source of bits and length are handled by the bitops function.
+to support custom key types.
 
 After initialization, you may use c3bt_add() to add some user objects and
 c3bt_remove() to remove them.  Again, these are all by reference: "add" won't
@@ -82,8 +81,8 @@ c3bt_next() and c3bt_prev() can help iterate through them.
 Bitops
 ------
 
-Bitops, meaning "bit operations", is a function specific to a key type.  Its job
-is to answer three kinds of queries about the key:
+Bitops, meaning "bit operations", is a function to implement a key data type.
+Its job is to answer three kinds of queries about the key:
 
  1. Get bit: what is the key's bit value at this position?
  2. Crit-bit: given two keys, which bit is the first bit where they differ?  Or,
@@ -112,9 +111,10 @@ write it on paper.  For example, 32-bit integers' MSB is bit #0 and LSB is bit
 #n*8+7.  You may call it pure big-endian.
 
 You may find many creative use of bitops.  Here are some ideas:
-  - A single tree can index objects of different types if bitops can
-    differentiate them by the key, like prepending a type id or domain id.
-  - Case insensitive string or strings with unusual encoding: translate
+  - A single tree can index objects of different types.  The bitops in this case
+    should present a larger key space and sort the objects into non-overlapping
+    ranges.  One solution could be prepending a type id or domain id.
+  - Case insensitive string or strings with non-trivial encodings: translate
     the characters by a collation table.
   - C3BT in LP32 mode limits the key to 256 bits but longer strings can be
     supported with a little compromise: bitops can compose the key as such --
@@ -154,11 +154,10 @@ Lookup in C3BT is straightforward: start from tree root, check the bit value of
 key at the position indicated by current node's "cbit".  If it's 0, follow the
 left child, otherwise follow the right.  If the child is a cell pointer,
 continue the search from node 0 in the new cell. If the child is an user object
-pointer, the lookup is done.
+pointer, return the pointer and the lookup is done.
 
-However as a compressing patricia trie, C3BT doesn't store the key in the tree,
-so a full key comparison is necessary to confirm the found object is indeed a
-match.
+However as a patricia trie, C3BT doesn't store the key in the tree, so a full
+key comparison is necessary to confirm the found object is indeed a match.
 
 2. Iteration
 C3BT iterates just like a standard BST, except that since the parent pointer

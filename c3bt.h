@@ -39,7 +39,7 @@ extern uint c3bt_stat_cells; /* numbers of cells in use. */
 extern uint c3bt_stat_pushdowns; /* node push-down operations. */
 extern uint c3bt_stat_splits; /* cell split operations. */
 extern uint c3bt_stat_pushups; /* up-merge of incomplete cells. */
-extern uint c3bt_stat_mergeups; /* upwards cell merges. */
+extern uint c3bt_stat_merges; /* cell merges. */
 
 /*
  * Count of cells grouped by occupancy. [n] holds number of cells with n+1
@@ -93,11 +93,11 @@ typedef struct c3bt_cursor {
 enum c3bt_key_datatypes {
     /* BITS: fixed-length bit string. */
     C3BT_KDT_BITS = 0,
+#ifdef C3BT_WITH_STRING
     /*
      * PSTR: the key is a pointer to a zero-terminated string.
      * STR: the key is a zero-terminated string.
      */
-#ifdef C3BT_WITH_STRING
     C3BT_KDT_PSTR, C3BT_KDT_STR,
 #endif
 #ifdef C3BT_WITH_INTS
@@ -114,10 +114,10 @@ enum c3bt_key_datatypes {
  * kbits - length (in bits) of the key.
  * Return true if successful.
  *
- * If kdt is an integer type, kbits is ignored, so you may just give a 0.  For
- * string type, you may also specify 0, meaning "best effort" and effectively it
- * is set to maximum supported length; otherwise values will be respected
- * faithfully.  Bit strings must have an exact, non-zero length.
+ * If kdt is an integer type kbits is ignored, so you may just give a 0.  For
+ * string type, you may also specify 0, meaning "best effort" and effectively
+ * kbits is set to maximum supported length; other values will be respected
+ * faithfully.  Bit string must have an exact, non-zero length.
  */
 extern bool c3bt_init(c3bt_tree *tree, uint kdt, uint koffset, uint kbits);
 
@@ -232,8 +232,8 @@ extern void *c3bt_last(c3bt_tree *tree, c3bt_cursor *cur);
  * Return the next higher ordered user object relative to the cursor, and the
  * cursor is updated accordingly.  cur must be a valid cursor.
  *
- * NULL is returned if current location has no successor, tree is empty, or
- * singleton.
+ * NULL is returned if current location has no successor, tree is null, empty,
+ * or singleton.
  */
 extern void *c3bt_next(c3bt_tree *tree, c3bt_cursor *cur);
 
@@ -243,15 +243,14 @@ extern void *c3bt_next(c3bt_tree *tree, c3bt_cursor *cur);
  * Return the next lower ordered user object relative to the cursor, and the
  * cursor is updated accordingly.  cur must be a valid cursor.
  *
- * NULL is returned if current location has no predecessor, tree is empty, or
- * singleton.
+ * NULL is returned if current location has no predecessor, tree is null,
+ * empty, or singleton.
  */
 extern void *c3bt_prev(c3bt_tree *tree, c3bt_cursor *cur);
 
 #ifdef __cplusplus
 }
 #endif
-
 #endif /*_C3BT_H_*/
 
 /* vim: set syn=c.doxygen cin et sw=4 ts=4 tw=80 fo=croqmM: */

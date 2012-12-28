@@ -38,13 +38,13 @@
  * Compact representation of a Crit-bit Tree node.
  *
  * Child can reference 3 kinds of targets:
- * - If MSB (0x80) is set, low bits is the index to a user object pointer.
- * - If next bit (0x40) is set, low bits is the index to a cell pointer.
- * - If both bits clear, it's an index of a c3bt_node within the same cell.  A
- *   special value, 0x3F, is used to mark an unoccupied node slot.
+ *    - If MSB (0x80) is set, low bits is the index to a user object pointer.
+ *    - If next bit (0x40) is set, low bits is the index to a cell pointer.
+ *    - If both bits are clear, it's an index of a c3bt_node within the same
+ *      cell.  A special value, 0x3F, is used to mark an unoccupied node slot.
  *
  * The differing bit number (crit-bit) is stored in a byte, so keys can be
- * indexed up to 256 bits in the standard layout.
+ * indexed up to 256 bits in the standard LP32 layout.
  */
 typedef struct c3bt_node {
     uint8_t cbit;
@@ -62,16 +62,16 @@ typedef struct c3bt_node {
 #define FLAGS_MASK          (CHILD_CELL_BIT | CHILD_UOBJ_BIT)
 
 /*
- * C3BT cell is 64B in size for 32-bit standard layout.
+ * Each C3BT cell is 64B under standard LP32 layout.
  *
  * Cell must be 8B-aligned to spare 3 low bits as node count.  This is already
  * satisfied by major platforms and C libraries but users of custom allocators
  * shall double check.
  *
  * Cell layout:
- * - PNC (parent & node count), 4B, [0, 3]
- * - Array of 8 crit-bit nodes, 24B, [4, 27]
- * - Array of 9 external pointers, 36B, [28, 63]
+ *    - PNC (parent & node count), 4B, [0, 3]
+ *    - Array of 8 crit-bit nodes, 24B, [4, 27]
+ *    - Array of 9 external pointers, 36B, [28, 63]
  *
  * Node[0] is always the root of the cell's subtree.
  */
@@ -104,7 +104,7 @@ uint c3bt_stat_cells;
 uint c3bt_stat_pushdowns;
 uint c3bt_stat_splits;
 uint c3bt_stat_pushups;
-uint c3bt_stat_mergeups;
+uint c3bt_stat_merges;
 uint c3bt_stat_popdist[NODES_PER_CELL];
 #endif
 
@@ -124,7 +124,7 @@ static int bitops_pstr(int, void *, void *);
 /*
  * Tree initialization with a common data type.
  */
-bool _osize c3bt_init(c3bt_tree *c3bt, uint kdt, uint koffset, uint kbits)
+bool c3bt_init(c3bt_tree *c3bt, uint kdt, uint koffset, uint kbits)
 {
     c3bt_tree_impl *tree;
 
@@ -325,26 +325,26 @@ static void cell_update_popdist(c3bt_cell *cell)
 
 bool c3bt_destroy(c3bt_tree *c3bt)
 {
-    c3bt_cell *head, *next, *del, *tmp;
+    c3bt_cell *cell, *next, *del, *tmp;
 
     if (c3bt == NULL)
         return false;
     /* Iterative Post-order Traversal of N-way Tree With Delayed Node Access.
      */
-    head = ((c3bt_tree_impl*)c3bt)->root;
+    cell = ((c3bt_tree_impl*)c3bt)->root;
     del = NULL;
-    while (head) {
-        next = cell_delist_subcell(head);
+    while (cell) {
+        next = cell_delist_subcell(cell);
         if (!next) {
             cell_free(del);
-            del = head;
+            del = cell;
 #ifdef C3BT_STATS
-            cell_update_popdist(head);
+            cell_update_popdist(cell);
 #endif
-            next = cell_delist_subcell(cell_parent(head));
+            next = cell_delist_subcell(cell_parent(cell));
             if (!next) {
-                while (cell_parent(head)) {
-                    next = cell_parent(head);
+                while (cell_parent(cell)) {
+                    next = cell_parent(cell);
                     cell_free(del);
                     del = next;
 #ifdef C3BT_STATS
@@ -355,13 +355,13 @@ bool c3bt_destroy(c3bt_tree *c3bt)
                         next = tmp;
                         break;
                     } else {
-                        head = next;
+                        cell = next;
                         next = NULL;
                     }
                 }
             }
         }
-        head = next;
+        cell = next;
     }
     cell_free(del);
     memset(c3bt, 0, sizeof(c3bt_tree_impl));
@@ -380,8 +380,9 @@ uint c3bt_nobjects(c3bt_tree *tree)
  *
  * Lookup from top of the tree trying to find the key, but it won't verify the
  * result.  Cursor is updated if specified. Special cases:
- * - Empty tree: return NULL, cur->cell is NULL, nid and cid undefined.
- * - Singleton tree: always return the uobj and cur is set as (nid=0, cid=0).
+ *    - Empty tree: return NULL, cur->cell is NULL, nid and cid undefined.
+ *    - Singleton tree: always return the uobj and cur is set as (nid=0,
+ *      cid=0).
  */
 static void *tree_lookup(c3bt_tree_impl *tree, void *key, c3bt_cursor_impl *cur)
 {
@@ -701,10 +702,10 @@ void *c3bt_next(c3bt_tree *c3bt, c3bt_cursor *cur)
 }
 
 /*
- * Find node's parent in a cell (input node can't be 0).
+ * Find node's parent in a cell.
  *
- * Let P be the parent of node N.  This function returns 2*P if N is P's left
- * child, or 2*P+1 if it's the right child.
+ * Return value is in the form of parent_node_id<<1|which_child_i_am.  Note:
+ * input can't be 0.
  */
 static int cell_node_parent(c3bt_cell *cell, int node)
 {
@@ -715,16 +716,17 @@ static int cell_node_parent(c3bt_cell *cell, int node)
             continue;
         for (c = 0; c < 2; c++)
             if (cell->N[n].child[c] == node)
-                goto done;
+                goto found;
     }
-    done:
+
+    found:
 
     return n << 1 | c;
 }
 
 /*
- * Find a split point for a fully populated cell.  Return the would-be new
- * cell-root and a bitmap representing the nodes to be moved.
+ * Find a split point for a fully populated cell.  Return the would-be new cell
+ * root and a bitmap representing the nodes to be moved.
  */
 static uint cell_find_split(c3bt_cell *cell, int *bitmap)
 {
@@ -756,7 +758,7 @@ static uint cell_find_split(c3bt_cell *cell, int *bitmap)
         /* Calculate deviation from perfect split. */
         c = count * 2 - NODES_PER_CELL;
         c = __builtin_abs(c);
-        if (c <= NODES_PER_CELL % 2)
+        if (c == NODES_PER_CELL % 2)
             return i;
         if (c < offset) {
             offset = c;
@@ -774,7 +776,7 @@ static uint cell_find_split(c3bt_cell *cell, int *bitmap)
 static bool cell_split(c3bt_cell *cell)
 {
     c3bt_cell *new_cell;
-    int i, n, c, p, new_root, count, bitmap;
+    int i, c, p, anchor, new_root, count, bitmap;
 
     new_cell = cell_malloc();
     if (!new_cell)
@@ -804,8 +806,8 @@ static bool cell_split(c3bt_cell *cell)
     /* Fix old cell. */
     p = cell_alloc_ptr(cell);
     cell->P[p] = new_cell;
-    n = cell_node_parent(cell, new_root);
-    cell->N[n >> 1].child[n & 1] = CHILD_CELL_BIT | p;
+    anchor = cell_node_parent(cell, new_root);
+    cell->N[anchor >> 1].child[anchor & 1] = CHILD_CELL_BIT | p;
     cell_dec_ncount(cell, count);
 
     /* Fix new cell. */
@@ -877,7 +879,7 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
         cur.cell->N[0].child[0] = CHILD_UOBJ_BIT | 0;
         cur.cell->N[0].child[1] = CHILD_CELL_BIT | 1;
         cur.cell->P[0] = uobj;
-        /* Redundant for a new cell.
+        /* Redundant for a new cell:
          * cur.cell->P[1] = NULL;
          * cur.cell->pnc = cell_make_pnc(NULL, 1);
          */
@@ -902,10 +904,13 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
     }
     /* Find insertion point. */
     if (cbit_nr > cur.cell->N[cur.nid].cbit) {
-        /* Shortcut if no need to search from root. */
+        /* No need to search from root. */
         lower = cur.cell->N[cur.nid].child[cur.cid];
     } else {
-        /* Find location for new node (from tree root). */
+        /* Find location for new node.  We need to start from tree root because
+         * it must follow the correct path, and we might insert a node with
+         * large cbit in a high cell (so upwards cell-by-cell won't work).
+         */
         cur.cell = tree->root;
 
         next:
@@ -925,9 +930,11 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
             }
         }
     }
-    /* Make room for a full cell. */
+    /* Make room for a full cell.  Re-searching the cell is necessary because
+     * we don't know if the insertion point has been moved out.
+     */
     if (cell_ncount(cur.cell) == NODES_PER_CELL) {
-        /* Try to push down a node first. It's cheaper. */
+        /* Try to push down a node first; it's cheaper. */
         if (cell_push_down(cur.cell))
             goto next;
         /* Then we have to split. */
@@ -997,51 +1004,53 @@ static int cell_find_anchor(c3bt_cell *cell, c3bt_cell *parent)
  */
 static void cell_merge(c3bt_cell *cell, c3bt_cell *parent, int anchor)
 {
-    int wtop, top, n, c, new_node, new_ptr;
-    uint8_t work_stack[NODES_PER_CELL];
-    uint8_t full_stack[NODES_PER_CELL * 2 - 1];
+    int wtop, ftop, n, c, new_node, new_ptr;
+    uint8_t wstack[NODES_PER_CELL];
+    uint8_t fstack[NODES_PER_CELL * 2 - 1];
 
     cell_free_ptr(parent,
         parent->N[anchor >> 1].child[anchor & 1] & INDEX_MASK);
-    /* Make a full post-order stack in full_stack. */
-    top = -1;
+    /* Use wstack to make a full post-order stack in fstack. */
+    ftop = -1;
     wtop = 0;
-    work_stack[0] = 0;
+    wstack[0] = 0;
     while (wtop >= 0) {
-        n = work_stack[wtop--];
-        full_stack[++top] = n;
+        n = wstack[wtop--];
+        fstack[++ftop] = n;
         if (CHILD_IS_NODE(n))
             for (c = 0; c < 2; c++)
-                work_stack[++wtop] = cell->N[n].child[c];
+                wstack[++wtop] = cell->N[n].child[c];
     }
-    /* Copy everything in full_stack. */
-    while (top >= 0) {
-        n = full_stack[top];
+    /* Copy everything in full stack. */
+    while (ftop >= 0) {
+        n = fstack[ftop];
         if (CHILD_IS_NODE(n)) {
-            /* Copy a node and fix its children. */
+            /* Copy a node with its children, and replace with its new index in
+             * parent cell.
+             */
             new_node = cell_alloc_node(parent);
             cell_inc_ncount(parent, 1);
             parent->N[new_node].cbit = cell->N[n].cbit;
-            wtop = top + 1;
+            wtop = ftop + 1;
             for (c = 1; c >= 0; c--) {
-                while (full_stack[wtop] == INVALID_NODE)
+                while (fstack[wtop] == INVALID_NODE)
                     wtop++;
-                parent->N[new_node].child[c] = full_stack[wtop];
-                full_stack[wtop] = INVALID_NODE;
+                parent->N[new_node].child[c] = fstack[wtop];
+                fstack[wtop] = INVALID_NODE;
             }
-            full_stack[top] = new_node;
+            fstack[ftop] = new_node;
         } else {
-            /* Copy a pointer. */
+            /* Copy a pointer and replace with its new index in parent cell. */
             new_ptr = cell_alloc_ptr(parent);
             c = n & INDEX_MASK;
             parent->P[new_ptr] = cell->P[c];
             if (CHILD_IS_CELL(n))
                 cell_set_parent(cell->P[c], parent);
-            full_stack[top] = (n & FLAGS_MASK) | new_ptr;
+            fstack[ftop] = (n & FLAGS_MASK) | new_ptr;
         }
-        top--;
+        ftop--;
     }
-    parent->N[anchor >> 1].child[anchor & 1] = full_stack[0];
+    parent->N[anchor >> 1].child[anchor & 1] = fstack[0];
     cell_free(cell);
 }
 
@@ -1072,12 +1081,15 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
             loc.cell->P[1] = NULL;
             goto done;
         } else {
-            /* Cell is becoming incomplete; push up then free. */
             if (!parent) {
+                /* Rare but possible: root cell has a single node, one child is
+                 * uobj pointer (being removed) and another is a cell pointer.
+                 */
                 tree->root = loc.cell->P[sibling & INDEX_MASK];
                 if (tree->root)
                     cell_set_parent(tree->root, 0);
             } else {
+                /* Non-root cell is becoming incomplete; push up then free. */
                 anchor = cell_find_anchor(loc.cell, parent);
                 pap = &parent->N[anchor >> 1].child[anchor & 1];
                 *pap &= INDEX_MASK;
@@ -1094,7 +1106,7 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
             goto done;
         }
     } else {
-        /* Not from cell root. */
+        /* Not removing from cell root. */
         n = cell_node_parent(loc.cell, loc.nid);
         loc.cell->N[n >> 1].child[n & 1] = loc.cell->N[loc.nid].child[1
             - loc.cid];
@@ -1127,7 +1139,7 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
     merge_done:
 
 #ifdef C3BT_STATS
-    c3bt_stat_mergeups++;
+    c3bt_stat_merges++;
     c3bt_stat_cells--;
 #endif
 
