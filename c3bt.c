@@ -1071,10 +1071,11 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
         /* Remove from cell root. */
         sibling = loc.cell->N[0].child[1 - loc.cid];
         if (CHILD_IS_NODE(sibling)) {
+            /* Sibling is a node: promote it to cell root. */
             loc.cell->N[0] = loc.cell->N[sibling];
             cell_free_node(loc.cell, sibling);
-        } else if (CHILD_IS_UOBJ(sibling) && parent == NULL) {
-            /* Turn to singleton tree. */
+        } else if (CHILD_IS_UOBJ(sibling) && !parent) {
+            /* Root cell has two uobjs: turn to singleton tree. */
             loc.cell->N[0].child[0] = CHILD_UOBJ_BIT | 0;
             loc.cell->N[0].child[1] = CHILD_CELL_BIT | 1;
             loc.cell->P[0] = loc.cell->P[sibling & INDEX_MASK];
@@ -1082,12 +1083,12 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
             goto done;
         } else {
             if (!parent) {
-                /* Rare but possible: root cell has a single node, one child is
+                /* Rare but possible: root cell has a single node; one child is
                  * uobj pointer (being removed) and another is a cell pointer.
                  */
                 tree->root = loc.cell->P[sibling & INDEX_MASK];
                 if (tree->root)
-                    cell_set_parent(tree->root, 0);
+                    cell_set_parent(tree->root, NULL);
             } else {
                 /* Non-root cell is becoming incomplete; push up then free. */
                 anchor = cell_find_anchor(loc.cell, parent);
@@ -1097,11 +1098,13 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
                 if (CHILD_IS_CELL(sibling))
                     cell_set_parent(parent->P[*pap], parent);
                 *pap |= sibling & FLAGS_MASK;
+#ifdef C3BT_STATS
+                c3bt_stat_pushups++;
+#endif
             }
             cell_free(loc.cell);
 #ifdef C3BT_STATS
             c3bt_stat_cells--;
-            c3bt_stat_pushups++;
 #endif
             goto done;
         }
