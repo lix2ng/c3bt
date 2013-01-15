@@ -1,7 +1,7 @@
 /*
  * C3BT: Compact Clustered Crit-Bit Tree
  *
- * Copyright (c) 2012 Ling LI <lix2ng@gmail.com>
+ * Copyright (c) 2012, 2013 Ling LI <lix2ng@gmail.com>
  *
  * TERMS OF USE:
  *   1. Do not remove the copyright notice above and this terms of use.
@@ -53,7 +53,7 @@ typedef struct c3bt_node {
 
 #define CBIT_MAX            255
 #define INVALID_NODE        0x3F
-#define CHILD_IS_NODE(x)    ((x) < 8)
+#define CHILD_IS_NODE(x)    ((x) < NODES_PER_CELL)
 #define CHILD_CELL_BIT      0x40
 #define CHILD_UOBJ_BIT      0x80
 #define CHILD_IS_CELL(x)    ((x) & CHILD_CELL_BIT)
@@ -908,8 +908,9 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
         lower = cur.cell->N[cur.nid].child[cur.cid];
     } else {
         /* Find location for new node.  We need to start from tree root because
-         * it must follow the correct path, and we might insert a node with
-         * large cbit in a high cell (so upwards cell-by-cell won't work).
+         * it must follow the correct path.  Since we may insert a node with
+         * large cbit number in a high cell, upwards cell-by-cell searching
+         * won't work.
          */
         cur.cell = tree->root;
 
@@ -930,8 +931,8 @@ bool c3bt_add(c3bt_tree *c3bt, void *uobj)
             }
         }
     }
-    /* Make room for a full cell.  Re-searching the cell is necessary because
-     * we don't know if the insertion point has been moved out.
+    /* Make room for a full cell.  Re-searching the cell afterwards is necessary
+     * because we don't know if the insertion point has been moved out.
      */
     if (cell_ncount(cur.cell) == NODES_PER_CELL) {
         /* Try to push down a node first; it's cheaper. */
@@ -1083,8 +1084,9 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
             goto done;
         } else {
             if (!parent) {
-                /* Rare but possible: root cell has a single node; one child is
-                 * uobj pointer (being removed) and another is a cell pointer.
+                /* Root cell has a single node, one child being uobj pointer (to
+                 * be removed) and another is a cell pointer.  This condition
+                 * also includes the singleton case.
                  */
                 tree->root = loc.cell->P[sibling & INDEX_MASK];
                 if (tree->root)
@@ -1177,10 +1179,11 @@ static int bitops_bits(int req, void *key1, void*key2)
 }
 
 /*
- * STR has variable length, and the caller can't know how long in advance, so
- * its bitops should return 0 for overrun requests. This is also needed for
- * proper ordering. E.g., "abc" and "abc1" should differ on bit #26, not #24
- * ("1" has 2 leading 0 bits).
+ * STR has variable length, and the caller can't know in advance, so its bitops
+ * should return 0 for overrun requests. This is also needed for correct
+ * ordering. E.g., "abc" and "abc1" should differ on bit #26, not #24 ("1" has 2
+ * leading 0 bits).
+ *
  */
 #ifdef C3BT_WITH_STRING
 static int bitops_str(int req, void *key1, void *key2)
@@ -1322,4 +1325,4 @@ static int bitops_s64(int req, void *key1, void *key2)
 }
 #endif
 
-/* vim: set syn=c.doxygen cin et sw=4 ts=4 tw=80 fo=croqmM: */
+/* vim: set syn=c.doxygen cin et sw=4 ts=4 tw=80 fo=croqmMj: */

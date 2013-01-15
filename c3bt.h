@@ -1,7 +1,7 @@
 /*
  * C3BT: Compact Clustered Crit-Bit Tree
  *
- * Copyright (c) 2012 Ling LI <lix2ng@gmail.com>
+ * Copyright (c) 2012, 2013 Ling LI <lix2ng@gmail.com>
  *
  * TERMS OF USE:
  *   1. Do not remove the copyright notice above and this terms of use.
@@ -40,7 +40,6 @@ extern uint c3bt_stat_pushdowns; /* node push-down operations. */
 extern uint c3bt_stat_splits; /* cell split operations. */
 extern uint c3bt_stat_pushups; /* up-merge of incomplete cells. */
 extern uint c3bt_stat_merges; /* cell merges. */
-
 /*
  * Count of cells grouped by occupancy. [n] holds number of cells with n+1
  * nodes.  Note: for ease of implementation, this data is collected during
@@ -82,7 +81,7 @@ typedef struct c3bt_tree {
 /*
  * The opaque version of cursor.
  *
- * Cursor is an internal coordination to indicate an user object's position.
+ * Cursor is the internal coordination to indicate an user object's position.
  * It's used in iteration.  Don't modify it directly.
  */
 typedef struct c3bt_cursor {
@@ -114,10 +113,10 @@ enum c3bt_key_datatypes {
  * kbits - length (in bits) of the key.
  * Return true if successful.
  *
- * If kdt is an integer type kbits is ignored, so you may just give a 0.  For
- * string type, you may also specify 0, meaning "best effort" and effectively
- * kbits is set to maximum supported length; other values will be respected
- * faithfully.  Bit string must have an exact, non-zero length.
+ * If kdt is a predefined fixed length type (like integers) kbits is ignored.
+ * For string type, kbit=0 means "best effort" and effectively kbits is set to
+ * maximum supported length; other values will be respected faithfully.  Bit
+ * string must have an exact, non-zero length.
  */
 extern bool c3bt_init(c3bt_tree *tree, uint kdt, uint koffset, uint kbits);
 
@@ -173,7 +172,7 @@ extern void *c3bt_find_bits(c3bt_tree *tree, uint8_t *key);
 /*
  * Find a zero-terminated string by value.
  *
- * Return the user object pointer when found, otherwise NULL.   This one
+ * Return the user object pointer when found, otherwise NULL.   This function
  * supports both STR and PSTR.
  */
 extern void *c3bt_find_str(c3bt_tree *tree, char *key);
@@ -201,10 +200,8 @@ extern void *c3bt_find_s64(c3bt_tree *tree, int64_t key);
  * If the user object is not in the tree, NULL is returned and cursor becomes
  * invalid.
  *
- * When using custom bitops, this function is the equivalent of "find-by-value".
- *
- * Note: the search is "by value", which mean the returned object would have the
- * same valued key as the input object, not necessarily itself.
+ * Note: the search is "by value".  The returned object would have the same
+ * valued key as the input object, not necessarily itself.
  */
 extern void *c3bt_locate(c3bt_tree *tree, void *uobj, c3bt_cursor *cur);
 
@@ -253,4 +250,4 @@ extern void *c3bt_prev(c3bt_tree *tree, c3bt_cursor *cur);
 #endif
 #endif /*_C3BT_H_*/
 
-/* vim: set syn=c.doxygen cin et sw=4 ts=4 tw=80 fo=croqmM: */
+/* vim: set syn=c.doxygen cin et sw=4 ts=4 tw=80 fo=croqmMj: */
