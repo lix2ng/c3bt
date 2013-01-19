@@ -41,7 +41,7 @@ extern uint c3bt_stat_splits; /* cell split operations. */
 extern uint c3bt_stat_pushups; /* up-merge of incomplete cells. */
 extern uint c3bt_stat_merges; /* cell merges. */
 /*
- * Count of cells grouped by occupancy. [n] holds number of cells with n+1
+ * Count of cells grouped by occupancy.  [n] holds number of cells with n+1
  * nodes.  Note: for ease of implementation, this data is collected during
  * tree_destroy(); so it's an autopsy.
  */
@@ -172,7 +172,7 @@ extern void *c3bt_find_bits(c3bt_tree *tree, uint8_t *key);
 /*
  * Find a zero-terminated string by value.
  *
- * Return the user object pointer when found, otherwise NULL.   This function
+ * Return the user object pointer when found, otherwise NULL.  This function
  * supports both STR and PSTR.
  */
 extern void *c3bt_find_str(c3bt_tree *tree, char *key);
@@ -227,7 +227,7 @@ extern void *c3bt_last(c3bt_tree *tree, c3bt_cursor *cur);
  * Return next valued user object.
  *
  * Return the next higher ordered user object relative to the cursor, and the
- * cursor is updated accordingly.  cur must be a valid cursor.
+ * cursor is updated accordingly.  "cur" must be a valid cursor.
  *
  * NULL is returned if current location has no successor, tree is null, empty,
  * or singleton.
@@ -238,7 +238,7 @@ extern void *c3bt_next(c3bt_tree *tree, c3bt_cursor *cur);
  * Return previous valued user object.
  *
  * Return the next lower ordered user object relative to the cursor, and the
- * cursor is updated accordingly.  cur must be a valid cursor.
+ * cursor is updated accordingly.  "cur" must be a valid cursor.
  *
  * NULL is returned if current location has no predecessor, tree is null,
  * empty, or singleton.

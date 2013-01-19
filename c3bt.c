@@ -53,7 +53,7 @@ typedef struct c3bt_node {
 
 #define CBIT_MAX            255
 #define INVALID_NODE        0x3F
-#define CHILD_IS_NODE(x)    ((x) < NODES_PER_CELL)
+#define CHILD_IS_NODE(x)    ((unsigned)(x) < NODES_PER_CELL)
 #define CHILD_CELL_BIT      0x40
 #define CHILD_UOBJ_BIT      0x80
 #define CHILD_IS_CELL(x)    ((x) & CHILD_CELL_BIT)
@@ -85,8 +85,8 @@ struct c3bt_cell {
 
 /* The C3BT tree structure for implementation. */
 typedef struct c3bt_tree_impl {
-    c3bt_cell *root; /* the root cell. */
     int (*bitops)(int, void *, void *); /* the bitops function. */
+    c3bt_cell *root; /* the root cell. */
     uint n_objects; /* number of user objects == number of nodes + 1. */
     uint key_offset; /* offset to the key in the user object. */
     uint16_t key_type; /* type of the key. */
@@ -95,8 +95,8 @@ typedef struct c3bt_tree_impl {
 
 typedef struct c3bt_cursor_impl {
     c3bt_cell *cell;
-    uint16_t nid; /* node index in cell. */
-    uint16_t cid; /* child index (0 or 1). */
+    int16_t nid; /* node index in cell. */
+    int16_t cid; /* child index (0 or 1). */
 } c3bt_cursor_impl;
 
 #ifdef C3BT_STATS
@@ -379,7 +379,7 @@ uint c3bt_nobjects(c3bt_tree *tree)
  * Tree lookup by key.
  *
  * Lookup from top of the tree trying to find the key, but it won't verify the
- * result.  Cursor is updated if specified. Special cases:
+ * result.  Cursor is updated if specified.  Special cases:
  *    - Empty tree: return NULL, cur->cell is NULL, nid and cid undefined.
  *    - Singleton tree: always return the uobj and cur is set as (nid=0,
  *      cid=0).
@@ -999,9 +999,9 @@ static int cell_find_anchor(c3bt_cell *cell, c3bt_cell *parent)
  * Merge a cell into its parent cell.
  *
  * Iterative post-order traversal using two stacks.  Sizes of the stacks are
- * set for largest possible cell (with NODES_PER_CELL-1 nodes).  This function
- * uses about 92B stack on x86 and 64B on ARM, which is a >70% reduction from
- * the recursive version under worst condition.
+ * fixed and are set for largest possible cell (with NODES_PER_CELL-1 nodes).
+ * This function uses about 92B stack on x86 and 64B on ARM, which is less than
+ * 1/3 of the recursive equivalent under worst condition.
  */
 static void cell_merge(c3bt_cell *cell, c3bt_cell *parent, int anchor)
 {
@@ -1084,9 +1084,9 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
             goto done;
         } else {
             if (!parent) {
-                /* Root cell has a single node, one child being uobj pointer (to
-                 * be removed) and another is a cell pointer.  This condition
-                 * also includes the singleton case.
+                /* Root cell has a single node, one child being uobj pointer
+                 * (being removed) and another is a cell pointer.  This
+                 * condition also covers the singleton case.
                  */
                 tree->root = loc.cell->P[sibling & INDEX_MASK];
                 if (tree->root)
@@ -1125,7 +1125,7 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
         cell_merge(loc.cell, parent, anchor);
         goto merge_done;
     }
-    /* Try merging up a subcell. */
+    /* Try merging up a sub-cell. */
     for (n = 0; n < NODES_PER_CELL; n++) {
         if (cell_node_is_vacant(loc.cell, n))
             continue;
@@ -1159,7 +1159,7 @@ bool c3bt_remove(c3bt_tree *c3bt, void *uobj)
  */
 
 /*
- * BITS' length is fixed in tree structure. The tail byte is zero-padded.
+ * BITS' length is fixed in tree structure.  The tail byte is zero-padded.
  */
 static int bitops_bits(int req, void *key1, void*key2)
 {
@@ -1180,9 +1180,9 @@ static int bitops_bits(int req, void *key1, void*key2)
 
 /*
  * STR has variable length, and the caller can't know in advance, so its bitops
- * should return 0 for overrun requests. This is also needed for correct
- * ordering. E.g., "abc" and "abc1" should differ on bit #26, not #24 ("1" has 2
- * leading 0 bits).
+ * should return 0 for overrun requests.  This is also needed for correct
+ * ordering.  E.g., "abc" and "abc1" should differ on bit #26, not #24 ("1" has
+ * 2 leading 0 bits).
  *
  */
 #ifdef C3BT_WITH_STRING
@@ -1248,7 +1248,8 @@ static int bitops_s32(int req, void *key1, void *key2)
     uint32_t bits;
 
     /* Shifting from [INT_MIN, INT_MAX] to [0, UINT_MAX] to maintain proper
-     * ordering for signed integers.  Subtraction and flipping MSB both will do.
+     * ordering for signed integers.  Subtraction and flipping MSB both will do
+     * the job.
      */
     bits = *(int32_t*)key1;
     if (req >= 0)

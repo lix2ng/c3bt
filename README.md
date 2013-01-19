@@ -1,20 +1,22 @@
 #C3BT: Compact Clustered Crit-Bit Tree
 
+
 ##Introduction
 
 Take Crit-Bit Tree (as CBT hereafter), squeeze the nodes into cache-line sized
-cells, and we get C3BT.  If you like, you may also read C3BT as "Cache-Conscious
-Crit-Bit Tree".
+cells, and we get C3BT.  The clustered layout reduces memory allocation overhead
+and most importantly it reduces cache line misses.  So if you like, you may also
+read C3BT as "Cache-Conscious Crit-Bit Tree".
 
 Don't know what a CBT is?  Look here: http://cr.yp.to/critbit.html
 
-In the 32-bit standard layout, each cell is 64 bytes and contains up to 8 crit-
-bit nodes.  It can index keys up to 256 bits long.  The LP64 version (TODO) uses
-128 byte cells each can hold 9 nodes and supports 64K-bit keys.
+In the 32-bit (LP32) layout, each cell is 64 bytes and contains up to 8 crit-bit
+nodes.  It can index keys up to 256 bits long.  The LP64 version (TODO) uses 128
+byte cells each can hold 9 nodes and supports 64K-bit keys.
 
 C3BT also extends the functionality of CBT.  Its API should be familiar to
 binary search tree users: INIT, DESTROY, ADD, REMOVE, FIND, FIRST, LAST, NEXT,
-and PREV.  Keys can be fixed-length bit-string, zero-terminated string, 32 and
+and PREV.  Keys can be fixed-length bit string, zero-terminated string, 32 and
 64 bit integers signed and unsigned, all with native ordering.  Custom or
 composite key data types are supported by custom "bitops" -- like a comparator
 to a BST.
@@ -23,18 +25,19 @@ Most implementations of BST embed index nodes in user objects; with C3BT, the
 index is separate and you add/remove user objects by reference.  The reason is
 that CBT node uses a crit-bit number to bisect the remaining key value space,
 which is not a part of user object (in comparison, BSTs use the user object/key
-as separator to bisect the remaining key set).  From users' point of view, there
-is no difference in the API.
+itself as separator to bisect the remaining key set).  From users' point of
+view, there is no difference in the API.
 
-A standard binary tree may not be known for good memory efficiency or reference
-locality and these are where C3BT has improved through its cache friendly layout
-scheme.  You get efficiency, performance and flexibility:
+A standard binary tree is not known for good memory efficiency or reference
+locality and these are where C3BT has improved through its cache friendly
+layout.  You get both the flexibility of a separate index and the performance of
+a dense, cache-optimized data structure.
 
-    - Memory allocation is per-cell; overhead is low.
-    - Index access is fast.
-    - User objects are not diluted by index; this can make a difference if user
-      object is small and densely stored.
-    - Index can be created and destroyed freely.
+  - Memory allocation is per-cell; overhead is low.
+  - Good performance due to much less cache line access.
+  - Index can be created and destroyed dynamically.
+  - Independent index won't dilute user data; this can make a big difference if
+    user objects are small and densely stored.
 
 Besides, C3BT uses parent pointers on the cell level but not in the nodes.  This
 speeds up iteration with little cost of space.
@@ -55,9 +58,9 @@ The code has statistics enabled by default.  If you don't need it, undefine
 `C3BT_STATS` in c3bt.h.
 
 If all you need is an associative array, you may define `C3BT_FEATURE_MIN` to
-reduce the code size.  You can lookup an user object by a key value; you can
-still iterate through the objects, but the ordering may be incorrect.  You need
-to treat your keys as bit-strings in this case.
+reduce code size.  You can lookup an user object by a key value; you can still
+iterate through the objects, but the ordering may be incorrect.  You need to
+treat your keys as bit strings in this case.
 
 ##Usage
 
@@ -140,8 +143,8 @@ all the nodes, and when tree-style traversal is necessary, a non-recursive
 algorithm would use only a few bytes as the stack.
 
 In the end, the cell fill factor and algorithm complexity of C3BT is comparable
-to in-memory B-Tree, but C3BT has higher density (measured by bytes/fanout) and
-very localized lookup (measured by cache-lines/lookup).
+to in-memory B-Tree, but C3BT has higher density (measured by bytes per fanout)
+and very localized lookup (measured by cache lines per lookup).
 
 On average C3BT in LP32 mode achieves 5.5 uobjs/cell.  Memory consumption can be
 estimated as: Nobj/5.5x64 (bytes).
@@ -150,7 +153,7 @@ estimated as: Nobj/5.5x64 (bytes).
 Lookup in C3BT is straightforward: start from tree root, check the bit value of
 key at the position indicated by current node's "cbit".  If it's 0, follow the
 left child, otherwise follow the right.  If the child is a cell pointer,
-continue the search from node 0 in the new cell. If the child is an user object
+continue the search from node 0 in the new cell.  If the child is an user object
 pointer, return the pointer and the lookup is done.
 
 However as a patricia trie, C3BT doesn't store the key in the tree, so a full
@@ -164,7 +167,7 @@ Profiling has shown it's quite efficient.
 
 ###Add
 Adding an user object in C3BT is like in CBT: fist step is to lookup the new
-object; compare the result with the new object to get their crit-bit number.
+object, compare the result with the new object to get their crit-bit number.
 Second step is to find a position along the path as the insertion point.  The
 second step should guarantee "cbit" is in ascending order from top to down.
 
