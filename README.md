@@ -186,5 +186,5 @@ After the removal, C3BT merges the cell to increase fill factor.  First try is
 to merge the cell to its parent, then try to merge one of the cell's sub-cells
 into it.
 
-# vim: set ai et ts=4 tw=80 syn=markdown spell spl=en_us fo=ta:
+vim: set ai et ts=4 tw=80 syn=markdown spell spl=en_us fo=ta:
 
