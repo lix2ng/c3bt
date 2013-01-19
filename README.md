@@ -1,5 +1,6 @@
 #C3BT: Compact Clustered Crit-Bit Tree
 
+- - -
 
 ##Introduction
 
@@ -77,8 +78,7 @@ Once you have some objects indexed, there are various `c3bt_find()` functions
 that can be used to find an object by key value, and `c3bt_first()`,
 `c3bt_last()`, `c3bt_next()` and `c3bt_prev()` can help iterate through them.
 
-Bitops
-------
+##Bitops
 
 Bitops, meaning "bit operations", is a function to implement a key data type.
 Its job is to answer three kinds of queries about the key:
