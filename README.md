@@ -97,7 +97,7 @@ The prototype is defined as:
 
     int bitops(int req, void *key1, void *key2);
 
-"req" is the request number.  When req>=0, it's a `get_bit` query.  Bitops
+"req" is the request number.  When req >= 0, it's a `get_bit` query.  Bitops
 should return the bit at position "req" of key1.  Key2 is ignored.
 
 If req < 0, it's a `crit_bit` query.  Bitops should return the differing bit
@@ -185,6 +185,45 @@ cell should be free-ed.  This may happen in cells at the lowest level.
 After the removal, C3BT merges the cell to increase fill factor.  First try is
 to merge the cell to its parent, then try to merge one of the cell's sub-cells
 into it.
+
+##Future Improvements
+
+There are many viable schemes of the C3BT cell layout:  node structure may
+change to support longer keys; spare bits can be used to improve performance;
+and the cell itself may become larger, e.g., 96B or 128B.
+
+C3BT uses many static inline functions to abstract out the layout-dependent
+operations, thus making it relatively easy to adapt to different cell layouts.
+You are encouraged to experiment.
+
+###Longer Keys
+256-bit length already covers most use cases: all primitive integer and floating
+point numbers, checksums, cryptographic hashes, UUID/GUID and short string
+identifiers.  If even longer keys are required, you may change the "cbit" from
+`uint8_t` to `uint16_t`.  The cell layout may change to: 4B header, 7 nodes, 8
+external pointers.  This translates to about 12% more memory usage.
+
+###Allocation Bitmap
+Most processors today have instructions like clz or fls which can be used to
+find a bit 1 very quickly.  If the layout has spare bytes, you may consider
+using them as an allocation map for the nodes and pointer array.  This will
+speed up node and pointer allocation.
+
+Current implementation use the lowest 3 bits in the parent pointer to track the
+number of nodes in a cell.  With a bitmap, you may leave the parent pointer
+alone and count the number of 1s in the bitmap instead.
+
+###Bit-Parallel Processing
+If you have access to SIMD instructions (SSE, Neon, AltiVec etc.) and horizontal
+comparison is cheap, congratulations!  You can greatly speed up the cell-level
+operations.  Node/pointer allocation and deallocation, finding a node's parent
+in a cell, finding a cell's anchor point in its parent cell... All these can be
+done in short sequences without looping.
+
+SIMD requires the elements to be packed.  You'll need to break down the node
+array (array of triplet [cbit, child0, child1]) to three smaller ones: cbit
+array, left child array and right child array.
+
 
 vim: set ai et ts=4 tw=80 syn=markdown spell spl=en_us fo=ta:
 
