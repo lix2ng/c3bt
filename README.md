@@ -200,7 +200,7 @@ You are encouraged to experiment.
 256-bit length already covers most use cases: all primitive integer and floating
 point numbers, checksums, cryptographic hashes, UUID/GUID and short string
 identifiers.  If even longer keys are required, you may change the "cbit" from
-`uint8_t` to `uint16_t`.  The cell layout may change to: 4B header, 7 nodes, 8
+`uint8_t` to `uint16_t`.  The cell layout becomes: 4B header, 7 nodes, 8
 external pointers.  This translates to about 12% more memory usage.
 
 ###Allocation Bitmap
@@ -214,14 +214,14 @@ number of nodes in a cell.  With a bitmap, you may leave the parent pointer
 alone and count the number of 1s in the bitmap instead.
 
 ###Bit-Parallel Processing
-If you have access to SIMD instructions (SSE, Neon, AltiVec etc.) and horizontal
-comparison is cheap, congratulations!  You can greatly speed up the cell-level
+If you have access to SIMD instructions (SSE, NEON, AltiVec etc.) and horizontal
+bit testing is cheap, congratulations!  You can greatly speed up the cell-level
 operations.  Node/pointer allocation and deallocation, finding a node's parent
 in a cell, finding a cell's anchor point in its parent cell... All these can be
 done in short sequences without looping.
 
 SIMD requires the elements to be packed.  You'll need to break down the node
-array (array of triplet [cbit, child0, child1]) to three smaller ones: cbit
+array (array of triplet [cbit, child0, child1]) into three smaller ones: cbit
 array, left child array and right child array.
 
 
