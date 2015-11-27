@@ -5,34 +5,35 @@
 ##Introduction
 
 As the name suggests, C3BT is a compact, clustered version of Crit-Bit Tree
-(CBT).  The cluster layout can improve memory allocation efficiency and more
-importantly it also reduces cache line misses.  So if you like, you may also
-read C3BT as "Cache-Conscious Crit-Bit Tree".
+(CBT).  The cluster layout improves memory allocation efficiency and more
+importantly it reduces cache line misses.  So if you like, you may also read
+C3BT as "Cache-Conscious Crit-Bit Tree".
 
 For more information about CBT, look here: http://cr.yp.to/critbit.html
 
-CBT nodes are organized into cells.  Under the 32-bit (LP32) layout, each cell
+CBT nodes are clustered into cells.  Under the 32-bit (LP32) layout, each cell
 is 64 bytes and contains up to 8 crit-bit nodes.  It can index keys up to 256
 bits long.  The LP64 version (TODO) uses 128 byte cells each can hold 9 nodes
 and supports 64K-bit keys.
 
 Comparison: C3BT-LP32 achieves >5 uobjs/cell fill factor on average; that is
-14.4B/uobj.  The original CBT would need 24B/uobj, losing half space to the
+14.4B/uobj.  The plain CBT would need 24B/uobj, losing half space to the
 overhead, and does 5 times the `malloc()` calls -- assuming the popular
-dlmalloc, which has 8B alignment and 8B overhead per allocated block.
+dlmalloc.
 
 C3BT also extends the functionality of CBT.  It has a complete, binary search
 tree (BST) alike API: INIT, DESTROY, ADD, REMOVE, FIND, FIRST, LAST, NEXT, and
 PREV.  Common key types are supported by default: fixed-length bit string,
 zero-terminated string, 32 and 64 bit integers signed and unsigned, all with
 native ordering.  Custom or composite key data types are supported by custom
-"bitops" which is analogous to a comparator of BST (explained below).
+"bitops" function which is analogous to a comparator of BST (explained below).
 
 Comparing with the ubiquitous BST, C3BT probably won't beat its simplicity but
-can improve reference locality.  If you have a large number of objects, and you
-make non-trivial use of the index (a range query will qualify), C3BT has much
-potential to perform better on a modern, memory-walled CPU.  With C3BT, you get
-both the flexibility of a separate index and the performance of a dense,
+can improve reference locality bacause C3BT doesn't need to access user data
+structure (uobj) during a search.  If you have a large number of objects, and
+you make non-trivial use of the index (an iteration will qualify), C3BT has
+much potential to perform better on a modern, memory-walled CPU.  With C3BT,
+you get both the flexibility of a separate index and the performance of a dense,
 cache-optimized data structure:
 
   - Memory allocation is per-cell; overhead is low.
@@ -42,13 +43,16 @@ cache-optimized data structure:
   - Independent index won't dilute user data, which can make a big difference if
     user objects are small and densely stored.
 
-The author hopes C3BT can help popularize CBT as an alternative to BSTs, T-Tree
-and in-memory B-Tree.  CBT works on the fundamental representation of data, and
-playing with bits is fun (and profitable in many cases).
+The code in this package is a starter, a proof of concept.  It demostrates how a
+clustered CBT can be done and how well it can perform.  The author hopes C3BT
+can help popularize CBT as an alternative to BSTs, T-Tree and in-memory B-Tree.
+CBT works on the fundamental representation of data, and playing with bits is
+fun (and profitable in this case).
 
 ##Build
 
-This version is built and tested under GCC on 32-bit Linux.  Just type "make".
+This version is built and tested using GCC on Linux or Cygwin.  Just type
+"make".
 
 There are 3 files: c3bt.h, c3bt.c and c3bt-main.c.  The first two are meant to
 be dropped in your project, and the third is an ugly ad-hoc tester.
@@ -56,23 +60,24 @@ be dropped in your project, and the third is an ugly ad-hoc tester.
 The code has statistics enabled by default.  If you don't need it, undefine
 `C3BT_STATS` in c3bt.h.
 
-If what you need is actually an associative array, you may define
-`C3BT_FEATURE_MIN` to reduce code size.  You can lookup an user object by a key
-value; you can still iterate through the objects, but the ordering may be
-incorrect (because all your keys are bit strings in this case).
+If what you need is just an associative array, you may define `C3BT_FEATURE_MIN`
+to reduce code size.  You can lookup an user object by a key value; you can
+still iterate through the objects, but the ordering may be incorrect (because
+they keys are treated as plain bit strings).
 
 ##Usage
 
-C3BT can be used in two ways, hence two init functions are provided.  One is
-`c3bt_init()` where you specify the key's data type, its offset in your object
-and the length.  The other one, `c3bt_init_bitops()`, allows you to install a
-bitops function to support custom key types.
+C3BT supports both builtin key types and custom key type, hence two init
+functions are provided.  One is `c3bt_init()` where you specify the key's data
+type, its offset in your object and the length.  The other one,
+`c3bt_init_bitops()`, allows you to install a bitops function for the custom
+key type.
 
-After initialization, you may use `c3bt_add()` to add some user objects and
+After initialization, you may use `c3bt_add()` to add some uobjs and
 `c3bt_remove()` to remove them.  Again, these are all by reference: "add" won't
 create or copy a object and "remove" won't free any.
 
-Once you have some objects indexed, there are various `c3bt_find()` functions
+Once you have some uobjs indexed, there are various `c3bt_find()` functions
 that can be used to find an object by key value, and `c3bt_first()`,
 `c3bt_last()`, `c3bt_next()` and `c3bt_prev()` can help iterate through them.
 
@@ -130,14 +135,14 @@ free to present whatever you like to the core algorithm.  Here are some ideas:
     real key to make them unique.
 
 Essentially, bitops fully decides what the key is; it must be constistent to
-produce meaningful results.  Bitops is called frequently, especially the
+produce meaningful results.  Bitops is also called frequently, especially the
 `get_bit` query.  You should make it as short and quick as possible.  If you use
 only one key type, you may consider inlining it to eliminate the function call
 overhead.
 
-Although bitops is a busy function, most of the time it's used on the same input
-key; there is no need to access other uobjs along a search path (`cbit` is all
-we need).  Impacts on data cache thus are at minimum.
+Although bitops is a busy function, most of the time it's used on the same
+input key/uobj (query only needs `cbit`, not other uobjs).  Impacts on data
+cache thus are at minimum.
 
 ##Algorithm
 
@@ -156,8 +161,8 @@ split and merge may look a bit complex, they are in fact not CPU hungry.
 C3BT belongs to the family of Patricia Trie or Radix Tree data structure, which
 are _not_ balanced.  However, these structures are insensitive to sequential key
 inputs since a sequential number series actually have favourable crit-bit
-distribution.  The most skewed bit pattern won't hurt either because tree depth
-is bound by key-length.
+distribution.  The most skewed input pattern won't hurt either because tree
+depth is bound by key-length.
 
 In the end, the cell fill factor and algorithm complexity of C3BT is comparable
 to in-memory B-Tree, but C3BT has higher density (measured by bytes per fanout)
@@ -168,7 +173,7 @@ Lookup in C3BT is straightforward: start from node 0 of the root cell, check the
 bit value of key at the position indicated by the node's "cbit".  If it's 0,
 follow the left child, otherwise follow the right.  If the child is a cell
 pointer, continue the search from node 0 in the child cell.  If the child is an
-user object pointer, return the pointer and the search is done.
+user object pointer, get the pointer and the search is done.
 
 However as a Patricia Trie, C3BT doesn't store the key in the tree, so a full
 key comparison is necessary to confirm the found object is indeed a match.
@@ -187,17 +192,17 @@ per-cell parent strikes a nice balance between cost and benefit.
 Adding an user object in C3BT is like in CBT: fist step is to lookup the new
 object, compare the result with the new object to get their crit-bit number.
 Second step is to find a position along the path as the insertion point.  The
-second step should guarantee "cbit" is in ascending order from top to down.
+second step should guarantee `cbit` is in ascending order from top to bottom.
 
 If the insertion point happens to be within a full cell, we must make room for
 the new node.  First attempt is to push an edge node down to a sub-cell.  If
-that fails, we split the cell in two.
+that fails, we have to split the cell in two.
 
 ###Remove
 Removing is one step: lookup the user object, then delete its reference.
 
 But some housekeeping has to be done afterwards: if the cell is becoming
-incomplete, i.e., when removing from a cell with only one node, the remaining
+incomplete, i.e. when removing from a cell with only one node, the remaining
 child should be coalesced into its parent cell then the cell should be free-ed.
 This may happen in cells at the lowest level. Otherwise, merging opportunities
 should be taken: first try merge the cell to its parent, then try to merge one
@@ -236,10 +241,17 @@ operations.  Node/pointer allocation and deallocation, finding a node's parent
 in a cell, finding a cell's anchor point in its parent cell... All these can be
 done in short sequences without looping.
 
-SIMD requires the elements to be packed.  You'll need to break down the node
-array (array of triplet [cbit, child0, child1]) into three smaller ones: cbit
-array, left child array and right child array.
+SIMD requires the elements to be packed.  You'll need to rearrange the node
+array (array of triplet [cbit, child0, child1]) into three: cbit array, left
+child array and right child array.
 
+### Read-Only Data Indexing
+Due to its dense and cache-friendly nature, C3BT would be a perfect candidate
+for indexing large amouts of read-only data.  The offline indexer can make the
+cells larger and 100% filled up; "pointers" can be shorter after serialization,
+further increasing density, etc.  The online, read-only query code, as
+described, is super lightweight.  It only does bit testing; there is no partial
+key or compressed key to decode; it even barely accesses the data.
 
 vim: set ai et ts=4 tw=80 syn=markdown spell spl=en_us fo=ta:
 
